@@ -133,12 +133,22 @@ if 'reduction_dims' not in st.session_state:
     st.session_state.reduction_dims = 3
 if 'reduction_method' not in st.session_state:
     st.session_state.reduction_method = 'PCA'
+
+# And finally the plotting options
 if 'label_columns' not in st.session_state:
     st.session_state.label_columns = None
 if 'color_column' not in st.session_state:
     st.session_state.color_column = None
 if 'hover_columns' not in st.session_state:
     st.session_state.hover_columns = None
+if 'plot_width' not in st.session_state:
+    st.session_state.plot_width = 800
+if 'plot_height' not in st.session_state:
+    st.session_state.plot_height = 800
+if 'marker_size' not in st.session_state:
+    st.session_state.marker_size = 5
+if 'marker_opacity' not in st.session_state:
+    st.session_state.marker_opacity = 1.0
 
 # Loading the handful of variables that don't persist across pages
 to_load = ['text_column']
@@ -191,6 +201,37 @@ with st.sidebar:
                        key='_hover_columns',
                        help="Choose the data you'd like to see for each point \
                         when you hover over the scatterplot.")
+        st.slider('Point size',
+                  min_value=1,
+                  max_value=20,
+                  key='_marker_size',
+                  on_change=strml.update_settings,
+                  kwargs={'keys': ['marker_size']},
+                  value=st.session_state.marker_size)
+        st.slider('Point opacity',
+                  min_value=0.0,
+                  max_value=1.0,
+                  step=0.001,
+                  key='_marker_opacity',
+                  on_change=strml.update_settings,
+                  kwargs={'keys': ['marker_opacity']})
+        st.slider('Plot width',
+                  min_value=100,
+                  max_value=1200,
+                  step=10,
+                  key='_plot_width',
+                  value=st.session_state.plot_width,
+                  on_change=strml.update_settings,
+                  kwargs={'keys': ['plot_width']},
+                  help='How wide to make the scatterplot')
+        st.slider('Plot height',
+                  min_value=100,
+                  max_value=1200,
+                  step=10,
+                  key='_plot_height',
+                  value=st.session_state.plot_height,
+                  on_change=strml.update_settings,
+                  kwargs={'keys': ['plot_height']})
 
     st.divider()
     st.write('Settings and Tools')
@@ -256,6 +297,7 @@ if st.session_state.source_file is not None:
                             x='d1', y='d2', z='d3',
                             hover_data=st.session_state.hover_columns,
                             color=st.session_state.color_column,
+                            opacity=st.session_state.marker_opacity,
                             width=800,
                             height=800)
     elif st.session_state.reduction_dims == 2:
@@ -263,4 +305,5 @@ if st.session_state.source_file is not None:
                          x='d1', y='d2',
                          width=800,
                          height=800)
+    fig.update_traces(marker=dict(size=st.session_state.marker_size))
     st.plotly_chart(fig, use_container_width=True)
