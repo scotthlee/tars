@@ -8,6 +8,8 @@ import plotly.express as px
 from dotenv import load_dotenv
 from azure.identity import ClientSecretCredential
 from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+from umap import UMAP
 
 from tools import oai, generic, strml
 
@@ -129,8 +131,8 @@ if 'text' not in st.session_state:
     st.session_state.text = None
 
 # Setting up the dimensionality reduction options
-if 'reduction_dims' not in st.session_state:
-    st.session_state.reduction_dims = 3
+if 'map_in_3d' not in st.session_state:
+    st.session_state.map_in_3d = True
 if 'reduction_method' not in st.session_state:
     st.session_state.reduction_method = 'PCA'
 
@@ -164,7 +166,7 @@ with st.sidebar:
                           type='csv',
                           key='_source_file',
                           on_change=strml.load_file)
-    with st.expander('Embed', expanded=True):
+    with st.expander('Embed', expanded=False):
         if st.session_state.source_file is not None:
             st.selectbox('Text Column',
                          key='_text_column',
@@ -177,7 +179,11 @@ with st.sidebar:
             key='_embedding_type',
             on_change=strml.update_settings,
             kwargs={'keys': ['embedding_type']},
-            options=['document', 'word']
+            options=['document', 'word'],
+            help="Whether you'd like to make embeddings for each 'document' \
+            in your dataset (documents being text contained by a single \
+            spreadhseet cell) or for the words in all the documents.",
+            disabled=True
         )
         st.selectbox(
             label='Model',
@@ -197,17 +203,16 @@ with st.sidebar:
                      kwargs={'keys': ['reduction_method']},
                      help='The algorithm used to reduce the dimensionality \
                      of the embeddings to make them viewable in 2- or 3-D.')
-        st.radio(label='Dimensions',
-                 options=[2, 3],
-                 horizontal=True,
-                 key='_reduction_dims',
+        st.toggle(label='3D',
+                 key='_map_in_3d',
+                 value=st.session_state.map_in_3d,
                  on_change=strml.update_settings,
-                 kwargs={'keys': ['reduction_dims']},
-                 help='Whether you want to visualize the embeddings in 2- or \
-                 3-D.')
+                 kwargs={'keys': ['map_in_3d']},
+                 help='Whether to reduce the embeddings to 3 dimensions \
+                 (instead of 2).')
         st.button('Start Reduction',
                   on_click=generic.reduce_dimensions)
-    with st.expander('Display', expanded=False):
+    with st.expander('Visualize', expanded=False):
         st.selectbox('Color points by',
                   options=st.session_state.source_file.columns.values,
                   key='_color_column',
@@ -224,7 +229,9 @@ with st.sidebar:
                   key='_marker_size',
                   on_change=strml.update_settings,
                   kwargs={'keys': ['marker_size']},
-                  value=st.session_state.marker_size)
+                  value=st.session_state.marker_size,
+                  help='How large you want the points in the scatterplot to \
+                  be.')
         st.slider('Marker opacity',
                   min_value=0.0,
                   max_value=1.0,
@@ -232,7 +239,9 @@ with st.sidebar:
                   value=st.session_state.marker_opacity,
                   key='_marker_opacity',
                   on_change=strml.update_settings,
-                  kwargs={'keys': ['marker_opacity']})
+                  kwargs={'keys': ['marker_opacity']},
+                  help='How opaque you want the points in the scatterplot to \
+                  be, with 1 being fully opaque, and 0 being transparent.')
         st.slider('Plot height',
                   min_value=100,
                   max_value=1200,
@@ -240,12 +249,15 @@ with st.sidebar:
                   key='_plot_height',
                   value=st.session_state.plot_height,
                   on_change=strml.update_settings,
-                  kwargs={'keys': ['plot_height']})
+                  kwargs={'keys': ['plot_height']},
+                  help='How tall you want the scatterplot to be. It will fill \
+                  the width of the screen by default, but the heigh is \
+                  adjustable.')
 
 
     st.divider()
     st.write('Settings and Tools')
-    with st.expander('Chat', expanded=False):
+    with st.expander('ChatGPT', expanded=False):
         curr_model = st.session_state.chat_model
         st.selectbox(
             label='Engine',
@@ -286,20 +298,21 @@ with st.sidebar:
         st.button('Reset', on_click=strml.reset_gpt)
 
 # Making the main visualization
-if st.session_state.source_file is not None:
-    if st.session_state.reduction_dims == 3:
-        fig = px.scatter_3d(st.session_state.source_file,
-                            x='d1', y='d2', z='d3',
-                            hover_data=st.session_state.hover_columns,
-                            color=st.session_state.color_column,
-                            opacity=st.session_state.marker_opacity,
-                            height=st.session_state.plot_height)
-    elif st.session_state.reduction_dims == 2:
-        fig = px.scatter(st.session_state.source_file,
-                         x='d1', y='d2',
-                         hover_data=st.session_state.hover_columns,
-                         color=st.session_state.color_column,
-                         opacity=st.session_state.marker_opacity,
-                         height=st.session_state.plot_height)
-    fig.update_traces(marker=dict(size=st.session_state.marker_size))
-    st.plotly_chart(fig, use_container_width=True)
+with st.container(border=True):
+    if st.session_state.source_file is not None:
+        if st.session_state.map_in_3d:
+            fig = px.scatter_3d(st.session_state.source_file,
+                                x='d1', y='d2', z='d3',
+                                hover_data=st.session_state.hover_columns,
+                                color=st.session_state.color_column,
+                                opacity=st.session_state.marker_opacity,
+                                height=st.session_state.plot_height)
+        else:
+            fig = px.scatter(st.session_state.source_file,
+                             x='d1', y='d2',
+                             hover_data=st.session_state.hover_columns,
+                             color=st.session_state.color_column,
+                             opacity=st.session_state.marker_opacity,
+                             height=st.session_state.plot_height)
+        fig.update_traces(marker=dict(size=st.session_state.marker_size))
+        st.plotly_chart(fig, use_container_width=True)
