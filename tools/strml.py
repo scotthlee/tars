@@ -56,19 +56,11 @@ def load_file():
     st.session_state.source_file = pd.read_csv(sf, encoding='latin')
     return
 
+
 def set_text():
     st.session_state.text = [
         d for d in st.session_state.source_file[st.session_state._text_column]
     ]
-    return
-
-def show_source_file():
-    with st.session_state.source_pane:
-        with st.expander('test'):
-            if st.session_state.source_type == 'pdf':
-                pdf_viewer(st.session_state.source_path)
-            elif st.session_state.source_type == 'csv':
-                st.dataframe(st.session_state.source_file)
     return
 
 

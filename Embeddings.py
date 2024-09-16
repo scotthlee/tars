@@ -4,6 +4,7 @@ import streamlit as st
 import openai
 import os
 import plotly.express as px
+import zipfile
 
 from dotenv import load_dotenv
 from azure.identity import ClientSecretCredential
@@ -22,9 +23,7 @@ st.set_page_config(page_title='NLP Tool',
 # Fetch an API key
 @st.cache_resource
 def load_oai_api_key():
-    """
-    Get API Key using Azure Service Principal
-    """
+    """Get API Key using Azure Service Principal."""
     load_dotenv()
 
     # Set up credentials based on Azure Service Principal
@@ -38,6 +37,7 @@ def load_oai_api_key():
     os.environ['OPENAI_API_KEY'] = credential.get_token(
         "https://cognitiveservices.azure.com/.default").token
 
+# load the API key
 load_oai_api_key()
 
 # Set up the OpenAI API settings
@@ -67,7 +67,8 @@ openai_dict = {
             'engine': 'text-embedding-ada-002',
             'url': os.environ['GPT4_URL'],
             'key': os.environ['OPENAI_API_KEY'],
-            'type': 'openai'
+            'type': 'openai',
+            'tokens_in': 8191
         }
     }
 }
@@ -103,7 +104,9 @@ if 'embedding_model' not in st.session_state:
 if 'embedding_type' not in st.session_state:
     st.session_state['embedding_type'] = 'openai'
 if 'embeddings' not in st.session_state:
-    st.session_state.embeddings = pd.read_csv('test.csv')
+    st.session_state.embeddings = None
+if 'embed_df' not in st.session_state:
+    st.session_state.embed_df = None
 
 if 'api_type' not in st.session_state:
     st.session_state.api_type = 'azure_ad'
@@ -124,7 +127,7 @@ if 'frequency_penalty' not in st.session_state:
 
 # Setting up the I?O objects
 if 'source_file' not in st.session_state:
-    st.session_state.source_file = pd.read_csv('ifrc.csv', encoding='latin')
+    st.session_state.source_file = None
 if 'text_column' not in st.session_state:
     st.session_state.text_column = None
 if 'text' not in st.session_state:
@@ -133,8 +136,20 @@ if 'text' not in st.session_state:
 # Setting up the dimensionality reduction options
 if 'map_in_3d' not in st.session_state:
     st.session_state.map_in_3d = True
+if 'reduction' not in st.session_state:
+    st.session_state.reduction = None
 if 'reduction_method' not in st.session_state:
-    st.session_state.reduction_method = 'PCA'
+    st.session_state.reduction_method = 'UMAP'
+if 'umap_n_neighbors' not in st.session_state:
+    st.session_state.umap_n_neighbors = 15
+if 'umap_min_dist' not in st.session_state:
+    st.session_state.umap_min_dist = 0.1
+if 'tsne_perplexity' not in st.session_state:
+    st.session_state.tsne_perplexity = 30.0
+if 'tsne_learning_rate' not in st.session_state:
+    st.session_state.tsne_learning_rate = 1000.0
+if 'tsne_n_iter' not in st.session_state:
+    st.session_state.tsne_n_iter = 1000
 
 # And finally the plotting options
 if 'label_columns' not in st.session_state:
@@ -148,11 +163,15 @@ if 'plot_width' not in st.session_state:
 if 'plot_height' not in st.session_state:
     st.session_state.plot_height = 800
 if 'marker_size' not in st.session_state:
-    st.session_state.marker_size = 5
+    st.session_state.marker_size = 3
 if 'marker_opacity' not in st.session_state:
     st.session_state.marker_opacity = 1.0
 if 'show_grid' not in st.session_state:
     st.session_state.show_grid = True
+if 'hover_data' not in st.session_state:
+    st.session_state.hover_data = {'d1': False, 'd2': False}
+if st.session_state.map_in_3d:
+    st.session_state.hover_data.update({'d3': False})
 
 # Loading the handful of variables that don't persist across pages
 to_load = ['text_column']
@@ -161,15 +180,17 @@ for key in to_load:
         strml.unkeep(key)
 
 with st.sidebar:
-    with st.expander('Load', expanded=True):
-        st.file_uploader('Load your Data',
-                          type='csv',
-                          key='_source_file',
-                          on_change=strml.load_file)
-    with st.expander('Embed', expanded=False):
+    with st.expander(label='Load',
+                     expanded=st.session_state.embeddings is None):
+        st.file_uploader(label='Load your data',
+                         type='csv',
+                         key='_source_file',
+                         on_change=strml.load_file)
+    with st.expander('Embed', expanded=st.session_state.embeddings is None):
         if st.session_state.source_file is not None:
             st.selectbox('Text Column',
                          key='_text_column',
+                         index=None,
                          options=st.session_state.source_file.columns.values,
                          on_change=strml.set_text,
                          help="Choose the column in your dataset holding the \
@@ -192,17 +213,64 @@ with st.sidebar:
             kwargs={'keys': ['embedding_model']},
             options=['ada-002']
         )
-        st.button('Generate Embeddings',
+        st.button(label='Generate Embeddings',
                   key='_embed_go',
                   on_click=oai.fetch_embeddings)
-    with st.expander('Reduce', expanded=False):
-        st.selectbox('Method',
-                     options=['PCA', 'UMAP', 't-SNE'],
+        if st.session_state.embeddings is not None:
+            algo = st.session_state.reduction_method
+            st.download_button(label='Save Embeddings',
+                               data=st.session_state.embeddings.to_csv(index=False),
+                               file_name=algo + '_embeddings.csv',
+                               mime='text/csv',
+                               key='_embed_save')
+    with st.expander('Reduce', expanded=st.session_state.reduction is None):
+        st.selectbox(label='Method',
+                     options=['UMAP', 't-SNE', 'PCA'],
+                     index=None,
                      key='_reduction_method',
+                     placeholder=st.session_state.reduction_method,
                      on_change=strml.update_settings,
                      kwargs={'keys': ['reduction_method']},
                      help='The algorithm used to reduce the dimensionality \
                      of the embeddings to make them viewable in 2- or 3-D.')
+        if st.session_state.reduction_method == 'UMAP':
+            st.slider('Nearest neighbors',
+                      min_value=2,
+                      max_value=200,
+                      value=st.session_state.umap_n_neighbors,
+                      key='_umap_n_neighbors',
+                      on_change=strml.update_settings,
+                      kwargs={'keys': ['umap_n_neighbors']})
+            st.slider('Minimum distance',
+                      min_value=0.0,
+                      max_value=1.0,
+                      step=0.001,
+                      value=st.session_state.umap_min_dist,
+                      key='_umap_min_dist',
+                      on_change=strml.update_settings,
+                      kwargs={'keys': ['umap_min_dist']})
+        if st.session_state.reduction_method == 't-SNE':
+            st.slider('Perplexity',
+                      min_value=5.0,
+                      max_value=50.0,
+                      value=st.session_state.tsne_perplexity,
+                      key='_tsne_perplexity',
+                      on_change=strml.update_settings,
+                      kwargs={'keys': ['tsne_perplexity']})
+            st.slider('Learning rate',
+                      min_value=100.00,
+                      max_value=1000.00,
+                      value=st.session_state.tsne_learning_rate,
+                      key='_tsne_learning_rate',
+                      on_change=strml.update_settings,
+                      kwargs={'keys': ['tsne_learning_rate']})
+            st.slider('Number of iterations',
+                      min_value=200,
+                      max_value=10000,
+                      value=st.session_state.tsne_n_iter,
+                      key='_tsne_n_iter',
+                      on_change=strml.update_settings,
+                      kwargs={'keys': ['tsne_n_iter']})
         st.toggle(label='3D',
                  key='_map_in_3d',
                  value=st.session_state.map_in_3d,
@@ -212,17 +280,22 @@ with st.sidebar:
                  (instead of 2).')
         st.button('Start Reduction',
                   on_click=generic.reduce_dimensions)
-    with st.expander('Visualize', expanded=False):
-        st.selectbox('Color points by',
-                  options=st.session_state.source_file.columns.values,
-                  key='_color_column',
-                  on_change=strml.update_settings,
-                  kwargs={'keys': ['color_column']})
-        st.multiselect('Show on hover',
-                       options=st.session_state.source_file.columns.values,
-                       key='_hover_columns',
-                       help="Choose the data you'd like to see for each point \
-                        when you hover over the scatterplot.")
+    with st.expander('Visualize',
+                     expanded=st.session_state.reduction is not None):
+        if st.session_state.source_file is not None:
+            st.selectbox('Color points by',
+                         index=None,
+                         options=st.session_state.source_file.columns.values,
+                         key='_color_column',
+                         on_change=strml.update_settings,
+                         kwargs={'keys': ['color_column']})
+            st.multiselect('Show on hover',
+                           options=st.session_state.source_file.columns.values,
+                           key='_hover_columns',
+                           on_change=strml.update_settings,
+                           kwargs={'keys': ['hover_columns']},
+                           help="Choose the data you'd like to see for each point \
+                            when you hover over the scatterplot.")
         st.slider('Marker size',
                   min_value=1,
                   max_value=20,
@@ -241,7 +314,7 @@ with st.sidebar:
                   on_change=strml.update_settings,
                   kwargs={'keys': ['marker_opacity']},
                   help='How opaque you want the points in the scatterplot to \
-                  be, with 1 being fully opaque, and 0 being transparent.')
+                  be. 1 is fully opaque, and 0 is fully transparent.')
         st.slider('Plot height',
                   min_value=100,
                   max_value=1200,
@@ -251,7 +324,7 @@ with st.sidebar:
                   on_change=strml.update_settings,
                   kwargs={'keys': ['plot_height']},
                   help='How tall you want the scatterplot to be. It will fill \
-                  the width of the screen by default, but the heigh is \
+                  the width of the screen by default, but the height is \
                   adjustable.')
 
 
@@ -300,17 +373,22 @@ with st.sidebar:
 # Making the main visualization
 with st.container(border=True):
     if st.session_state.source_file is not None:
+        hover_data = st.session_state.hover_data
+        if st.session_state.hover_columns is not None:
+            hover_data.update(
+                {col: True for col in st.session_state.hover_columns}
+            )
         if st.session_state.map_in_3d:
             fig = px.scatter_3d(st.session_state.source_file,
                                 x='d1', y='d2', z='d3',
-                                hover_data=st.session_state.hover_columns,
+                                hover_data=hover_data,
                                 color=st.session_state.color_column,
                                 opacity=st.session_state.marker_opacity,
                                 height=st.session_state.plot_height)
         else:
             fig = px.scatter(st.session_state.source_file,
                              x='d1', y='d2',
-                             hover_data=st.session_state.hover_columns,
+                             hover_data=hover_data,
                              color=st.session_state.color_column,
                              opacity=st.session_state.marker_opacity,
                              height=st.session_state.plot_height)

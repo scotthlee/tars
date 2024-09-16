@@ -1,7 +1,10 @@
 import openai
 import streamlit as st
+import numpy as np
+import pandas as pd
 
 from azure.identity import ClientSecretCredential
+from umap.umap_ import nearest_neighbors
 
 from tools.generic import reduce_dimensions
 
@@ -22,6 +25,8 @@ def load_openai_settings(mode='chat'):
 
 
 def fetch_embeddings():
+    """Generates embeddings for the user's text, along with the associated \
+    PCA reduction for initial visualization."""
     if st.session_state.embedding_type == 'openai':
         load_openai_settings(mode='embeddings')
         text = st.session_state.text[0:2000]
@@ -29,10 +34,15 @@ def fetch_embeddings():
             input=text,
             engine=st.session_state.embedding_engine,
         )
-        embeddings = [response['data'][i]['embedding']
-                      for i in range(len(text))]
+        embeddings = np.array([response['data'][i]['embedding']
+                      for i in range(len(text))])
     if st.session_state.embedding_type == 'huggingface':
         pass
-    st.session_state.embeddings = embeddings
-    reduce_dimensions(embeddings)
+    st.session_state.embeddings = pd.DataFrame(embeddings)
+    st.session_state.precomputed_nn = nearest_neighbors(embeddings,
+                                                        n_neighbors=250,
+                                                        metric='euclidean',
+                                                        metric_kwds=None,
+                                                        angular=False,
+                                                        random_state=None)
     return
