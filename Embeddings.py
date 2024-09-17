@@ -21,7 +21,6 @@ st.set_page_config(page_title='NLP Tool',
                 page_icon='📖')
 
 # Fetch an API key
-@st.cache_resource
 def load_oai_api_key():
     """Get API Key using Azure Service Principal."""
     load_dotenv()
@@ -199,7 +198,10 @@ with st.sidebar:
                  options=list(st.session_state.data_type_dict.keys()),
                  key='_data_type',
                  on_change=strml.update_settings,
-                 kwargs={'keys': ['data_type']})
+                 kwargs={'keys': ['data_type']},
+                 help="The kind of data you want to load. If you don't have \
+                 embeddings made yet, choose tabular data or bulk documents, \
+                 depending on how your text is saved, to get started.")
         st.file_uploader(label='Select the file(s)',
                          type=st.session_state.data_type_dict[st.session_state.data_type],
                          key='_source_file',
@@ -240,7 +242,7 @@ with st.sidebar:
                                file_name='embeddings.csv',
                                mime='text/csv',
                                key='_embed_save')
-    with st.expander('Reduce', expanded=st.session_state.reduction is None):
+    with st.expander('Reduce', expanded=not bool(st.session_state.reduction_dict)):
         st.selectbox(label='Method',
                      options=['UMAP', 't-SNE', 'PCA'],
                      index=None,
@@ -306,28 +308,29 @@ with st.sidebar:
         st.button('Start Reduction',
                   on_click=generic.reduce_dimensions)
     with st.expander('Visualize',
-                     expanded=st.session_state.reduction is not None):
-        st.selectbox('Choose a reduction',
-                     index=None,
-                     key='_current_reduction',
-                     placeholder=st.session_state.current_reduction,
-                     options=list(st.session_state.reduction_dict.keys()),
-                     on_change=strml.update_settings,
-                     kwargs={'keys': ['current_reduction']})
-        if st.session_state.metadata is not None:
-            st.selectbox('Color points by',
+                     expanded=bool(st.session_state.reduction_dict)):
+        if bool(st.session_state.reduction_dict):
+            st.selectbox('Choose a reduction',
                          index=None,
-                         options=st.session_state.metadata.columns.values,
-                         key='_color_column',
+                         key='_current_reduction',
+                         options=list(st.session_state.reduction_dict.keys()),
+                         placeholder=st.session_state.current_reduction,
                          on_change=strml.update_settings,
-                         kwargs={'keys': ['color_column']})
-            st.multiselect('Show on hover',
-                           options=st.session_state.metadata.columns.values,
-                           key='_hover_columns',
-                           on_change=strml.update_settings,
-                           kwargs={'keys': ['hover_columns']},
-                           help="Choose the data you'd like to see for each point \
-                            when you hover over the scatterplot.")
+                         kwargs={'keys': ['current_reduction']})
+            if st.session_state.metadata is not None:
+                st.selectbox('Color points by',
+                             index=None,
+                             options=st.session_state.metadata.columns.values,
+                             key='_color_column',
+                             on_change=strml.update_settings,
+                             kwargs={'keys': ['color_column']})
+                st.multiselect('Show on hover',
+                               options=st.session_state.metadata.columns.values,
+                               key='_hover_columns',
+                               on_change=strml.update_settings,
+                               kwargs={'keys': ['hover_columns']},
+                               help="Choose the data you'd like to see for each point \
+                                when you hover over the scatterplot.")
         st.slider('Marker size',
                   min_value=1,
                   max_value=20,
@@ -404,7 +407,7 @@ with st.sidebar:
 
 # Making the main visualization
 with st.container(border=True):
-    if st.session_state.embeddings is not None:
+    if bool(st.session_state.reduction_dict):
         # Construct the hover columns
         hover_data = st.session_state.hover_data
         if st.session_state.hover_columns is not None:

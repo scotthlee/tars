@@ -61,7 +61,7 @@ def load_file():
         try:
             loaded_source = pd.read_csv(sf)
         except:
-            loaded_source = pd.read_cs(sf, encoding='latin')
+            loaded_source = pd.read_csv(sf, encoding='latin')
         st.session_state.source_file = loaded_source
         st.session_state.metadata = loaded_source
     elif data_type == 'Bulk documents':

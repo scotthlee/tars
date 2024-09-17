@@ -14,6 +14,8 @@ def reduce_dimensions(reduction_method=None):
     Algorithm options are PCA, UMAP, and t-SNE."""
     if reduction_method is None:
         reduction_method = st.session_state.reduction_method
+    else:
+        st.session_state.reduction_method = reduction_method
     dims = 3 if st.session_state.map_in_3d else 2
     if reduction_method == 'PCA':
         reducer = PCA(n_components=dims)
@@ -26,12 +28,13 @@ def reduce_dimensions(reduction_method=None):
         reducer = TSNE(n_components=dims,
                        perplexity=st.session_state.tsne_perplexity,
                        n_iter=st.session_state.tsne_n_iter)
-    with st.spinner('Running the dimensionality reduction algorithm. Please \
-                    wait.'):
+    with st.spinner('Running the dimensionality reduction algorithm'):
         reduction = reducer.fit_transform(st.session_state.embeddings)
     colnames = ['d' + str(i + 1) for i in range(dims)]
     reduction = pd.DataFrame(reduction, columns=colnames)
-    st.session_state.reduction_dict.update({name_reduction(): reduction})
+    reduction_name = name_reduction()
+    st.session_state.reduction_dict.update({reduction_name: reduction})
+    st.session_state.current_reduction = reduction_name
     return
 
 
@@ -50,8 +53,8 @@ def name_reduction():
         }
     }
     curr_method = st.session_state.reduction_method
-    curr_name = param_dict[curr_method]['name']
     if curr_method != 'PCA':
+        curr_name = param_dict[curr_method]['name']
         param_vals = [
             str(st.session_state[curr_name + '_' + p])
             for p in param_dict[curr_method]['params']
@@ -74,7 +77,7 @@ def average_embeddings(embeddings, weights=None, axis=0):
 
 def compute_nn():
     embeddings = st.session_state.embeddings
-    with st.spinner('Calculating nearest neighbors. Please weight.'):
+    with st.spinner('Calculating nearest neighbors. Please wait.'):
         nn = nearest_neighbors(embeddings,
                                n_neighbors=250,
                                metric='euclidean',
