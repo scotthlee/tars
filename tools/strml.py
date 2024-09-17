@@ -8,6 +8,9 @@ import pandas as pd
 import streamlit as st
 
 
+from tools.generic import compute_nn
+
+
 def keep(key):
     """Sets a session state variable's value based on the corresponding
     widget value.
@@ -53,7 +56,29 @@ def load_file():
     dictionary.
     """
     sf = st.session_state._source_file
-    st.session_state.source_file = pd.read_csv(sf, encoding='latin')
+    data_type = st.session_state.data_type
+    if data_type == 'Tabular data with text column':
+        try:
+            loaded_source = pd.read_csv(sf)
+        except:
+            loaded_source = pd.read_cs(sf, encoding='latin')
+        st.session_state.source_file = loaded_source
+        st.session_state.metadata = loaded_source
+    elif data_type == 'Bulk documents':
+        pass
+    elif data_type == 'Premade embeddings':
+        try:
+            embeddings = pd.read_csv(sf)
+        except:
+            embeddings = pd.read_csv(sf, encoding='latin')
+        st.session_state.embeddings = embeddings
+        compute_nn()
+    elif data_type == 'Metadata':
+        try:
+            metadata = pd.read_csv(sf)
+        except:
+            metadata = pd.read_csv(sf, encoding='latin')
+        st.session_state.metadata = metadata
     return
 
 

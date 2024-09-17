@@ -105,8 +105,6 @@ if 'embedding_type' not in st.session_state:
     st.session_state['embedding_type'] = 'openai'
 if 'embeddings' not in st.session_state:
     st.session_state.embeddings = None
-if 'embed_df' not in st.session_state:
-    st.session_state.embed_df = None
 
 if 'api_type' not in st.session_state:
     st.session_state.api_type = 'azure_ad'
@@ -128,10 +126,21 @@ if 'frequency_penalty' not in st.session_state:
 # Setting up the I?O objects
 if 'source_file' not in st.session_state:
     st.session_state.source_file = None
+if 'metadata' not in st.session_state:
+    st.session_state.metadata = None
 if 'text_column' not in st.session_state:
     st.session_state.text_column = None
 if 'text' not in st.session_state:
     st.session_state.text = None
+if 'data_type' not in st.session_state:
+    st.session_state.data_type = 'Tabular data with text column'
+if 'data_type_dict' not in st.session_state:
+    st.session_state.data_type_dict = {
+        'Tabular data with text column': ['csv'],
+        'Bulk documents': ['pdf', 'txt'],
+        'Premade embeddings': ['csv', 'tsv'],
+        'Metadata': ['csv']
+    }
 
 # Setting up the dimensionality reduction options
 if 'map_in_3d' not in st.session_state:
@@ -150,6 +159,10 @@ if 'tsne_learning_rate' not in st.session_state:
     st.session_state.tsne_learning_rate = 1000.0
 if 'tsne_n_iter' not in st.session_state:
     st.session_state.tsne_n_iter = 1000
+if 'reduction_dict' not in st.session_state:
+    st.session_state.reduction_dict = {}
+if 'current_reduction' not in st.session_state:
+    st.session_state.current_reduction = None
 
 # And finally the plotting options
 if 'label_columns' not in st.session_state:
@@ -174,7 +187,7 @@ if st.session_state.map_in_3d:
     st.session_state.hover_data.update({'d3': False})
 
 # Loading the handful of variables that don't persist across pages
-to_load = ['text_column']
+to_load = ['text_column', 'data_type']
 for key in to_load:
     if st.session_state[key] is not None:
         strml.unkeep(key)
@@ -182,8 +195,13 @@ for key in to_load:
 with st.sidebar:
     with st.expander(label='Load',
                      expanded=st.session_state.embeddings is None):
-        st.file_uploader(label='Load your data',
-                         type='csv',
+        st.radio('What kind of data do you want to load?',
+                 options=list(st.session_state.data_type_dict.keys()),
+                 key='_data_type',
+                 on_change=strml.update_settings,
+                 kwargs={'keys': ['data_type']})
+        st.file_uploader(label='Select the file(s)',
+                         type=st.session_state.data_type_dict[st.session_state.data_type],
                          key='_source_file',
                          on_change=strml.load_file)
     with st.expander('Embed', expanded=st.session_state.embeddings is None):
@@ -213,14 +231,13 @@ with st.sidebar:
             kwargs={'keys': ['embedding_model']},
             options=['ada-002']
         )
-        st.button(label='Generate Embeddings',
+        st.button(label='Generate embeddings',
                   key='_embed_go',
                   on_click=oai.fetch_embeddings)
         if st.session_state.embeddings is not None:
-            algo = st.session_state.reduction_method
-            st.download_button(label='Save Embeddings',
+            st.download_button(label='Download embeddings',
                                data=st.session_state.embeddings.to_csv(index=False),
-                               file_name=algo + '_embeddings.csv',
+                               file_name='embeddings.csv',
                                mime='text/csv',
                                key='_embed_save')
     with st.expander('Reduce', expanded=st.session_state.reduction is None):
@@ -240,7 +257,13 @@ with st.sidebar:
                       value=st.session_state.umap_n_neighbors,
                       key='_umap_n_neighbors',
                       on_change=strml.update_settings,
-                      kwargs={'keys': ['umap_n_neighbors']})
+                      kwargs={'keys': ['umap_n_neighbors']},
+                      help='This parameter controls how UMAP balances \
+                      local versus global structure. Low values will force \
+                      UMAP to concentrate on very local structure, while \
+                      large values will push UMAP to look at larger \
+                      neighborhoods of each point when estimating \
+                      the mainfold structure of the data.')
             st.slider('Minimum distance',
                       min_value=0.0,
                       max_value=1.0,
@@ -248,7 +271,9 @@ with st.sidebar:
                       value=st.session_state.umap_min_dist,
                       key='_umap_min_dist',
                       on_change=strml.update_settings,
-                      kwargs={'keys': ['umap_min_dist']})
+                      kwargs={'keys': ['umap_min_dist']},
+                      help='Controls how tightly UMAP is allowed to pack \
+                      points together.')
         if st.session_state.reduction_method == 't-SNE':
             st.slider('Perplexity',
                       min_value=5.0,
@@ -282,15 +307,22 @@ with st.sidebar:
                   on_click=generic.reduce_dimensions)
     with st.expander('Visualize',
                      expanded=st.session_state.reduction is not None):
-        if st.session_state.source_file is not None:
+        st.selectbox('Choose a reduction',
+                     index=None,
+                     key='_current_reduction',
+                     placeholder=st.session_state.current_reduction,
+                     options=list(st.session_state.reduction_dict.keys()),
+                     on_change=strml.update_settings,
+                     kwargs={'keys': ['current_reduction']})
+        if st.session_state.metadata is not None:
             st.selectbox('Color points by',
                          index=None,
-                         options=st.session_state.source_file.columns.values,
+                         options=st.session_state.metadata.columns.values,
                          key='_color_column',
                          on_change=strml.update_settings,
                          kwargs={'keys': ['color_column']})
             st.multiselect('Show on hover',
-                           options=st.session_state.source_file.columns.values,
+                           options=st.session_state.metadata.columns.values,
                            key='_hover_columns',
                            on_change=strml.update_settings,
                            kwargs={'keys': ['hover_columns']},
@@ -372,21 +404,30 @@ with st.sidebar:
 
 # Making the main visualization
 with st.container(border=True):
-    if st.session_state.source_file is not None:
+    if st.session_state.embeddings is not None:
+        # Construct the hover columns
         hover_data = st.session_state.hover_data
         if st.session_state.hover_columns is not None:
             hover_data.update(
                 {col: True for col in st.session_state.hover_columns}
             )
+
+        # Assemble any metadata
+        display_data = st.session_state.reduction_dict[
+            st.session_state.current_reduction
+        ]
+        if st.session_state.metadata is not None:
+            display_data = pd.concat([display_data, st.session_state.metadata],
+                                     axis=1)
         if st.session_state.map_in_3d:
-            fig = px.scatter_3d(st.session_state.source_file,
+            fig = px.scatter_3d(data_frame=display_data,
                                 x='d1', y='d2', z='d3',
                                 hover_data=hover_data,
                                 color=st.session_state.color_column,
                                 opacity=st.session_state.marker_opacity,
                                 height=st.session_state.plot_height)
         else:
-            fig = px.scatter(st.session_state.source_file,
+            fig = px.scatter(data_frame=display_data,
                              x='d1', y='d2',
                              hover_data=hover_data,
                              color=st.session_state.color_column,
