@@ -163,6 +163,36 @@ if 'reduction_dict' not in st.session_state:
 if 'current_reduction' not in st.session_state:
     st.session_state.current_reduction = None
 
+# Setting up the clustering parameters
+cluster_dict = {
+    'DBSCAN': {
+        'sklearn_name': 'DBSCAN',
+        'lower_name': 'dbscan',
+        'params': ['eps', 'min_samples', 'n_jobs'],
+        'param_abbrevs': ['eps', 'min_samp', 'n_jobs']
+    },
+    'k-means': {
+        'sklearn_name': 'KMeans',
+        'lower_name': 'kmeans',
+        'params': ['n_clusters', 'max_iter'],
+        'param_abbrevs': ['n_clust', 'max_iter']
+    }
+}
+if 'cluster_dict' not in st.session_state:
+    st.session_state.cluster_dict = cluster_dict
+if 'clustering_algorithm' not in st.session_state:
+    st.session_state.clustering_algorithm = 'DBSCAN'
+if 'dbscan_eps' not in st.session_state:
+    st.session_state.dbscan_eps = 0.5
+if 'dbscan_min_samples' not in st.session_state:
+    st.session_state.dbscan_min_samples = 5
+if 'dbscan_n_jobs' not in st.session_state:
+    st.session_state.dbscan_n_jobs = -1
+if 'kmeans_n_clusters' not in st.session_state:
+    st.session_state.kmeans_n_clusters = 8
+if 'kmeans_max_iter' not in st.session_state:
+    st.session_state.max_iter = 300
+
 # And finally the plotting options
 if 'label_columns' not in st.session_state:
     st.session_state.label_columns = None
@@ -182,6 +212,8 @@ if 'show_grid' not in st.session_state:
     st.session_state.show_grid = True
 if 'hover_data' not in st.session_state:
     st.session_state.hover_data = {'d1': False, 'd2': False}
+if 'show_legend' not in st.session_state:
+    st.session_state.show_legend = True
 if st.session_state.map_in_3d:
     st.session_state.hover_data.update({'d3': False})
 
@@ -191,9 +223,17 @@ for key in to_load:
     if st.session_state[key] is not None:
         strml.unkeep(key)
 
+# Some bools for controlling menu expansions
+has_embeddings = st.session_state.embeddings is not None
+has_reduction = bool(st.session_state.reduction_dict)
+has_metadata = st.session_state.metadata is not None
+if has_reduction:
+    has_clusters = st.session_state.reduction_dict[st.session_state.current_reduction]['clusters'] is not None
+else:
+    has_reduction = False
+
 with st.sidebar:
-    with st.expander(label='Load',
-                     expanded=st.session_state.embeddings is None):
+    with st.expander(label='Load', expanded=not has_embeddings):
         st.radio('What kind of data do you want to load?',
                  options=list(st.session_state.data_type_dict.keys()),
                  key='_data_type',
@@ -206,7 +246,7 @@ with st.sidebar:
                          type=st.session_state.data_type_dict[st.session_state.data_type],
                          key='_source_file',
                          on_change=strml.load_file)
-    with st.expander('Embed', expanded=st.session_state.embeddings is None):
+    with st.expander('Embed', expanded=not has_embeddings):
         if st.session_state.source_file is not None:
             st.selectbox('Text Column',
                          key='_text_column',
@@ -242,7 +282,7 @@ with st.sidebar:
                                file_name='embeddings.csv',
                                mime='text/csv',
                                key='_embed_save')
-    with st.expander('Reduce', expanded=not bool(st.session_state.reduction_dict)):
+    with st.expander('Reduce', expanded=not has_reduction):
         st.selectbox(label='Method',
                      options=['UMAP', 't-SNE', 'PCA'],
                      index=None,
@@ -299,16 +339,26 @@ with st.sidebar:
                       on_change=strml.update_settings,
                       kwargs={'keys': ['tsne_n_iter']})
         st.toggle(label='3D',
-                 key='_map_in_3d',
-                 value=st.session_state.map_in_3d,
-                 on_change=strml.update_settings,
-                 kwargs={'keys': ['map_in_3d']},
-                 help='Whether to reduce the embeddings to 3 dimensions \
-                 (instead of 2).')
+                  key='_map_in_3d',
+                  value=st.session_state.map_in_3d,
+                  on_change=strml.update_settings,
+                  kwargs={'keys': ['map_in_3d']},
+                  help='Whether to reduce the embeddings to 3 dimensions \
+                  (instead of 2).')
         st.button('Start Reduction',
                   on_click=generic.reduce_dimensions)
-    with st.expander('Visualize',
-                     expanded=bool(st.session_state.reduction_dict)):
+    with st.expander('Cluster', expanded=has_reduction):
+        st.selectbox('Algorithm',
+                     options=list(cluster_dict.keys()),
+                     key='_clustering_algorithm',
+                     placeholder=st.session_state.clustering_algorithm,
+                     on_change=strml.update_settings,
+                     kwargs={'keys': ['clustering_algorithm']},
+                     help='The algorithm to use for grouping the embeddings \
+                     into clusters.')
+        st.button('Run algorithm',
+                  on_click=generic.run_clustering)
+    with st.expander('Visualize', expanded=has_reduction):
         if bool(st.session_state.reduction_dict):
             st.selectbox('Choose a reduction',
                          index=None,
@@ -316,21 +366,45 @@ with st.sidebar:
                          options=list(st.session_state.reduction_dict.keys()),
                          placeholder=st.session_state.current_reduction,
                          on_change=strml.update_settings,
-                         kwargs={'keys': ['current_reduction']})
-            if st.session_state.metadata is not None:
+                         kwargs={'keys': ['current_reduction']},
+                         help='Choose a lower-dimension version of the \
+                         embeddings to display. PCA is calculated and \
+                         displayed by default, but you can add other \
+                         reductions to the list using the "Reduce" widget \
+                         above.')
+            if (has_metadata) or (has_clusters):
+                display_cols = []
+                if has_clusters:
+                    display_cols += list(st.session_state.reduction_dict[
+                        st.session_state.current_reduction
+                    ]['clusters'].columns.values)
+                if has_metadata:
+                    display_cols += list(st.session_state.metadata.columns.values)
                 st.selectbox('Color points by',
                              index=None,
-                             options=st.session_state.metadata.columns.values,
+                             options=display_cols,
                              key='_color_column',
                              on_change=strml.update_settings,
-                             kwargs={'keys': ['color_column']})
+                             kwargs={'keys': ['color_column']},
+                             help='The variable used to color the points in \
+                             the plot. Continuous variables will generally \
+                             produce a single color (graded by the value of the \
+                             variable), and discrete variables will produce \
+                             a palette of discrete colors, one for each level \
+                             of the variable.')
                 st.multiselect('Show on hover',
-                               options=st.session_state.metadata.columns.values,
+                               options=display_cols,
                                key='_hover_columns',
                                on_change=strml.update_settings,
                                kwargs={'keys': ['hover_columns']},
-                               help="Choose the data you'd like to see for each point \
-                                when you hover over the scatterplot.")
+                               help="Choose the data you'd like to see for each \
+                               point when you hover over the scatterplot.")
+                st.toggle('Show legend',
+                          key='_show_legend',
+                          value=st.session_state.show_legend,
+                          on_change=strml.update_settings,
+                          kwargs={'keys': ['show_legend']},
+                          help='Turns the plot legend on and off.')
         st.slider('Marker size',
                   min_value=1,
                   max_value=20,
@@ -362,49 +436,6 @@ with st.sidebar:
                   the width of the screen by default, but the height is \
                   adjustable.')
 
-
-    st.divider()
-    st.write('Settings and Tools')
-    with st.expander('ChatGPT', expanded=False):
-        curr_model = st.session_state.chat_model
-        st.selectbox(
-            label='Engine',
-            key='_model_name',
-            on_change=strml.update_settings,
-            kwargs={'keys': ['model_name']},
-            index=st.session_state.engine_choices.index(curr_model),
-            options=st.session_state.engine_choices)
-        st.number_input(label='Max Tokens',
-                        key='_max_tokens',
-                        on_change=strml.update_settings,
-                        kwargs={'keys': ['max_tokens']},
-                        value=st.session_state.max_tokens)
-        st.slider(label='Temperature',
-                key='_temperature',
-                on_change=strml.update_settings,
-                kwargs={'keys': ['temperature']},
-                value=st.session_state.temperature)
-        st.slider(label='Top P',
-                key='_top_p',
-                on_change=strml.update_settings,
-                kwargs={'keys': ['top_p']},
-                value=st.session_state.top_p)
-        st.slider(label='Presence Penalty',
-                min_value=0.0,
-                max_value=2.0,
-                key='_presence_penalty',
-                on_change=strml.update_settings,
-                kwargs={'keys': ['presence_penalty']},
-                value=st.session_state.presence_penalty)
-        st.slider(label='Frequency Penalty',
-                min_value=0.0,
-                max_value=2.0,
-                key='_frequency_penalty',
-                on_change=strml.update_settings,
-                kwargs={'keys': ['frequency_penalty']},
-                value=st.session_state.frequency_penalty)
-        st.button('Reset', on_click=strml.reset_gpt)
-
 # Making the main visualization
 with st.container(border=True):
     if bool(st.session_state.reduction_dict):
@@ -416,15 +447,22 @@ with st.container(border=True):
             )
 
         # Assemble any metadata
-        display_data = st.session_state.reduction_dict[
+        current_reduc = st.session_state.reduction_dict[
             st.session_state.current_reduction
         ]
-        if st.session_state.metadata is not None:
+        display_data = current_reduc['points']
+        has_clusters = current_reduc['clusters'] is not None
+        if has_clusters:
+            algo = st.session_state.clustering_algorithm
+            cluster_cols = current_reduc['clusters'].columns.values
+            display_data[cluster_cols] = current_reduc['clusters'].values
+        if has_metadata:
             display_data = pd.concat([display_data, st.session_state.metadata],
                                      axis=1)
         if st.session_state.map_in_3d:
             fig = px.scatter_3d(data_frame=display_data,
                                 x='d1', y='d2', z='d3',
+                                title=st.session_state.current_reduction,
                                 hover_data=hover_data,
                                 color=st.session_state.color_column,
                                 opacity=st.session_state.marker_opacity,
@@ -437,4 +475,5 @@ with st.container(border=True):
                              opacity=st.session_state.marker_opacity,
                              height=st.session_state.plot_height)
         fig.update_traces(marker=dict(size=st.session_state.marker_size))
+        fig.update_layout(showlegend=st.session_state.show_legend)
         st.plotly_chart(fig, use_container_width=True)

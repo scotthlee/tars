@@ -5,6 +5,7 @@ import streamlit as st
 
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
+from sklearn.cluster import KMeans, DBSCAN
 from umap import UMAP
 from umap.umap_ import nearest_neighbors
 
@@ -28,12 +29,14 @@ def reduce_dimensions(reduction_method=None):
         reducer = TSNE(n_components=dims,
                        perplexity=st.session_state.tsne_perplexity,
                        n_iter=st.session_state.tsne_n_iter)
-    with st.spinner('Running the dimensionality reduction algorithm'):
+    with st.spinner('Running the dimensionality reduction algorithm...'):
         reduction = reducer.fit_transform(st.session_state.embeddings)
     colnames = ['d' + str(i + 1) for i in range(dims)]
     reduction = pd.DataFrame(reduction, columns=colnames)
     reduction_name = name_reduction()
-    st.session_state.reduction_dict.update({reduction_name: reduction})
+    st.session_state.reduction_dict.update({
+        reduction_name: {'points': reduction, 'clusters': None}
+    })
     st.session_state.current_reduction = reduction_name
     return
 
@@ -76,8 +79,9 @@ def average_embeddings(embeddings, weights=None, axis=0):
 
 
 def compute_nn():
+    """Pre-computes the nearest neighbors graph for UMAP."""
     embeddings = st.session_state.embeddings
-    with st.spinner('Calculating nearest neighbors. Please wait.'):
+    with st.spinner('Calculating nearest neighbors...'):
         nn = nearest_neighbors(embeddings,
                                n_neighbors=250,
                                metric='euclidean',
@@ -85,4 +89,32 @@ def compute_nn():
                                angular=False,
                                random_state=None)
     st.session_state.precomputed_nn = nn
+    return
+
+
+def run_clustering():
+    """Runs a cluster analysis on the user's chosen reduction. Cluster IDs and \
+    centers are saved to the reduction's dictionary entry for plotting.
+    """
+    algo = st.session_state.clustering_algorithm
+    cd = st.session_state.cluster_dict
+    mod_name = cd[algo]['sklearn_name']
+    lower_name = cd[algo]['lower_name']
+    kwargs = {p: st.session_state[lower_name + '_' + p]
+              for p in cd[algo]['params']}
+    mod = globals()[mod_name](**kwargs)
+    reduc_name = st.session_state.current_reduction
+    with st.spinner('Running the clustering algorithm...'):
+        mod.fit(st.session_state.reduction_dict[reduc_name]['points'])
+    if algo == 'DBSCAN':
+        centers = mod.core_sample_indices_
+    elif algo == 'KMeans':
+        centers = mod.cluster_centers_
+    cluster_df = st.session_state.reduction_dict[reduc_name]['clusters']
+    labels = np.array(mod.labels_).astype(str)
+    if cluster_df is not None:
+        cluster_df[lower_name + '_id'] = labels
+    else:
+        cluster_df = pd.DataFrame(mod.labels_, columns=[lower_name + '_id'])
+    st.session_state.reduction_dict[reduc_name]['clusters'] = cluster_df.astype(str)
     return

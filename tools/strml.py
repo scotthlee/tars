@@ -8,7 +8,7 @@ import pandas as pd
 import streamlit as st
 
 
-from tools.generic import compute_nn
+from tools.generic import compute_nn, reduce_dimensions
 
 
 def keep(key):
@@ -73,6 +73,7 @@ def load_file():
             embeddings = pd.read_csv(sf, encoding='latin')
         st.session_state.embeddings = embeddings
         compute_nn()
+        reduce_dimensions(reduction_method='PCA')
     elif data_type == 'Metadata':
         try:
             metadata = pd.read_csv(sf)
@@ -86,6 +87,7 @@ def set_text():
     st.session_state.text = [
         d for d in st.session_state.source_file[st.session_state._text_column]
     ]
+    st.session_state.hover_columns = [st.session_state._text_column]
     return
 
 

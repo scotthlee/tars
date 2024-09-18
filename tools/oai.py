@@ -30,7 +30,7 @@ def fetch_embeddings():
     if st.session_state.embedding_type == 'openai':
         load_openai_settings(mode='embeddings')
         text = st.session_state.text[0:2000]
-        with st.spinner('Fetching the embeddings. Please wait.'):
+        with st.spinner('Fetching the embeddings...'):
             response = openai.Embedding.create(
                 input=text,
                 engine=st.session_state.embedding_engine,
