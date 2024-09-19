@@ -56,30 +56,31 @@ def load_file():
     dictionary.
     """
     sf = st.session_state._source_file
-    data_type = st.session_state.data_type
-    if data_type == 'Tabular data with text column':
-        try:
-            loaded_source = pd.read_csv(sf)
-        except:
-            loaded_source = pd.read_csv(sf, encoding='latin')
-        st.session_state.source_file = loaded_source
-        st.session_state.metadata = loaded_source
-    elif data_type == 'Bulk documents':
-        pass
-    elif data_type == 'Premade embeddings':
-        try:
-            embeddings = pd.read_csv(sf)
-        except:
-            embeddings = pd.read_csv(sf, encoding='latin')
-        st.session_state.embeddings = embeddings
-        compute_nn()
-        reduce_dimensions(reduction_method='PCA')
-    elif data_type == 'Metadata':
-        try:
-            metadata = pd.read_csv(sf)
-        except:
-            metadata = pd.read_csv(sf, encoding='latin')
-        st.session_state.metadata = metadata
+    if sf is not None:
+        data_type = st.session_state.data_type
+        if data_type == 'Tabular data with text column':
+            try:
+                loaded_source = pd.read_csv(sf)
+            except:
+                loaded_source = pd.read_csv(sf, encoding='latin')
+            st.session_state.source_file = loaded_source
+            st.session_state.metadata = loaded_source
+        elif data_type == 'Bulk documents':
+            pass
+        elif data_type == 'Premade embeddings':
+            try:
+                embeddings = pd.read_csv(sf)
+            except:
+                embeddings = pd.read_csv(sf, encoding='latin')
+            st.session_state.embeddings = embeddings
+            compute_nn()
+            reduce_dimensions(reduction_method='PCA')
+        elif data_type == 'Metadata':
+            try:
+                metadata = pd.read_csv(sf)
+            except:
+                metadata = pd.read_csv(sf, encoding='latin')
+            st.session_state.metadata = metadata
     return
 
 
@@ -96,4 +97,10 @@ def clear_source_files():
     st.session_state.source_type = ''
     st.session_state.source_texxt = ''
     st.session_state.all_text = st.session_state.prompt
+    return
+
+
+def switch_reduction():
+    update_settings(['current_reduction'])
+    st.session_state.color_column = None
     return

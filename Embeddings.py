@@ -175,7 +175,13 @@ cluster_dict = {
         'sklearn_name': 'KMeans',
         'lower_name': 'kmeans',
         'params': ['n_clusters', 'max_iter'],
-        'param_abbrevs': ['n_clust', 'max_iter']
+        'param_abbrevs': ['k', 'max_iter']
+    },
+    'Agglomerative': {
+        'sklearn_name': 'AgglomerativeClustering',
+        'lower_name': 'aggl',
+        'params': ['n_clusters', 'metric', 'linkage'],
+        'param_abbrevs': ['n_clust', 'metric', 'link']
     }
 }
 if 'cluster_dict' not in st.session_state:
@@ -191,7 +197,13 @@ if 'dbscan_n_jobs' not in st.session_state:
 if 'kmeans_n_clusters' not in st.session_state:
     st.session_state.kmeans_n_clusters = 8
 if 'kmeans_max_iter' not in st.session_state:
-    st.session_state.max_iter = 300
+    st.session_state.kmeans_max_iter = 300
+if 'aggl_n_clusters' not in st.session_state:
+    st.session_state.aggl_n_clusters = 2
+if 'aggl_metric' not in st.session_state:
+    st.session_state.aggl_metric = 'euclidean'
+if 'aggl_linkage' not in st.session_state:
+    st.session_state.aggl_linkage = 'ward'
 
 # And finally the plotting options
 if 'label_columns' not in st.session_state:
@@ -282,7 +294,8 @@ with st.sidebar:
                                file_name='embeddings.csv',
                                mime='text/csv',
                                key='_embed_save')
-    with st.expander('Reduce', expanded=not has_reduction):
+    with st.expander('Reduce', expanded=(not has_reduction) and
+                     has_embeddings):
         st.selectbox(label='Method',
                      options=['UMAP', 't-SNE', 'PCA'],
                      index=None,
@@ -351,11 +364,64 @@ with st.sidebar:
         st.selectbox('Algorithm',
                      options=list(cluster_dict.keys()),
                      key='_clustering_algorithm',
+                     index=None,
                      placeholder=st.session_state.clustering_algorithm,
                      on_change=strml.update_settings,
                      kwargs={'keys': ['clustering_algorithm']},
                      help='The algorithm to use for grouping the embeddings \
                      into clusters.')
+        if st.session_state.clustering_algorithm == 'DBSCAN':
+            st.slider('Epsilon',
+                      min_value=0.01,
+                      max_value=10.0,
+                      value=st.session_state.dbscan_eps,
+                      on_change=strml.update_settings,
+                      key='_dbscan_eps',
+                      kwargs={'keys': ['dbscan_eps']},
+                      help='The maximum distance between two samples for one \
+                      to be considered as in the neighborhood of the other.')
+            st.slider('Minimum samples',
+                      min_value=1,
+                      max_value=100,
+                      value=st.session_state.dbscan_min_samples,
+                      on_change=strml.update_settings,
+                      key='_dbscan_min_samples',
+                      kwargs={'keys': ['dbscan_min_samples']},
+                      help='The number of samples in a neighborhood for a \
+                      point to be considered as a core point. At higher \
+                      values, the algorithm will find denser clusters, and \
+                      at lower values, the clusters will be more sparser.')
+        elif st.session_state.clustering_algorithm == 'k-means':
+            st.slider('Number of clusters',
+                      min_value=1,
+                      max_value=100,
+                      key='_kmeans_n_clusters',
+                      value=st.session_state.kmeans_n_clusters,
+                      on_change=strml.update_settings,
+                      kwargs={'keys': ['kmeans_n_clusters']})
+            st.slider('Max iterations',
+                      min_value=1,
+                      max_value=500,
+                      key='_kmeans_max_iter',
+                      value=st.session_state.kmeans_max_iter,
+                      on_change=strml.update_settings,
+                      kwargs={'keys': ['kmeans_max_iter']})
+        elif st.session_state.clustering_algorithm == 'Agglomerative':
+            st.selectbox('Metric',
+                         options=['euclidean', 'l1', 'l2',
+                                  'manhattan', 'cosine'],
+                         key='_aggl_metric',
+                         index=None,
+                         placeholder=st.session_state.aggl_metric,
+                         on_change=strml.update_settings,
+                         kwargs={'keys': ['aggl_metric']})
+            st.slider('Number of clusters',
+                      min_value=2,
+                      max_value=100,
+                      key='_aggl_n_clusters',
+                      value=st.session_state.aggl_n_clusters,
+                      on_change=strml.update_settings,
+                      kwargs={'keys': ['aggl_n_clusters']})
         st.button('Run algorithm',
                   on_click=generic.run_clustering)
     with st.expander('Visualize', expanded=has_reduction):
@@ -365,8 +431,7 @@ with st.sidebar:
                          key='_current_reduction',
                          options=list(st.session_state.reduction_dict.keys()),
                          placeholder=st.session_state.current_reduction,
-                         on_change=strml.update_settings,
-                         kwargs={'keys': ['current_reduction']},
+                         on_change=strml.switch_reduction,
                          help='Choose a lower-dimension version of the \
                          embeddings to display. PCA is calculated and \
                          displayed by default, but you can add other \
@@ -471,6 +536,7 @@ with st.container(border=True):
             fig = px.scatter(data_frame=display_data,
                              x='d1', y='d2',
                              hover_data=hover_data,
+                             title=st.session_state.current_reduction,
                              color=st.session_state.color_column,
                              opacity=st.session_state.marker_opacity,
                              height=st.session_state.plot_height)
