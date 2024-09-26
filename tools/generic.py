@@ -9,6 +9,7 @@ from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering
 from umap import UMAP
 from umap.umap_ import nearest_neighbors
 from scipy.cluster.hierarchy import dendrogram
+from matplotlib import pyplot as plt
 
 
 def reduce_dimensions(reduction_method=None):
@@ -30,13 +31,17 @@ def reduce_dimensions(reduction_method=None):
         reducer = TSNE(n_components=dims,
                        perplexity=st.session_state.tsne_perplexity,
                        n_iter=st.session_state.tsne_n_iter)
-    with st.spinner('Running the dimensionality reduction algorithm...'):
+    with st.spinner('Running ' + reduction_method + '...'):
         reduction = reducer.fit_transform(st.session_state.embeddings)
     colnames = ['d' + str(i + 1) for i in range(dims)]
     reduction = pd.DataFrame(reduction, columns=colnames)
     reduction_name = name_reduction()
     st.session_state.reduction_dict.update({
-        reduction_name: {'points': reduction, 'clusters': None}
+        reduction_name: {
+            'points': reduction, 
+            'cluster_ids': None,
+            'cluster_mods': {}
+        }
     })
     st.session_state.current_reduction = reduction_name
     return
@@ -111,24 +116,27 @@ def run_clustering():
         centers = mod.core_sample_indices_
     elif algo == 'KMeans':
         centers = mod.cluster_centers_
-    cluster_df = st.session_state.reduction_dict[reduc_name]['clusters']
+    cluster_df = st.session_state.reduction_dict[reduc_name]['cluster_ids']
     labels = np.array(mod.labels_).astype(str)
     if cluster_df is not None:
         cluster_df[lower_name + '_id'] = labels
     else:
         cluster_df = pd.DataFrame(mod.labels_, columns=[lower_name + '_id'])
-    st.session_state.reduction_dict[reduc_name]['clusters'] = cluster_df.astype(str)
+    st.session_state.reduction_dict[reduc_name]['cluster_ids'] = cluster_df.astype(str)
+    st.session_state.reduction_dict[reduc_name]['cluster_mods'].update({lower_name: mod})
     return
 
 
 @st.dialog('Dendrogram')
 def show_dendrogram():
     current_reduc = st.session_state.current_reduction
-    if 'aggl' not in st.session_state.reduction_dict[current_reduc]['clusters']:
+    if 'aggl' not in st.session_state.reduction_dict[current_reduc]['cluster_mods']:
         st.write('Please run the agglomerative clustering algorithm to see \
                  a dendrogram.')
     else:
-        make_dendrogram()
+        mod = st.session_state.reduction_dict[current_reduc]['cluster_mods']['aggl']
+        fig = make_dendrogram(mod)
+        st.pyplot(fig=fig, clear_figure=True)
     st.write('Hello!')
 
 

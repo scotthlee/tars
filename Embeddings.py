@@ -180,8 +180,10 @@ cluster_dict = {
     'Agglomerative': {
         'sklearn_name': 'AgglomerativeClustering',
         'lower_name': 'aggl',
-        'params': ['n_clusters', 'metric', 'linkage'],
-        'param_abbrevs': ['n_clust', 'metric', 'link']
+        'params': ['metric', 'linkage', 'n_clusters',
+                   'compute_distances', 'distance_threshold'],
+        'param_abbrevs': ['metric', 'link', 'comp_dist',
+                          'dist_thr']
     }
 }
 if 'cluster_dict' not in st.session_state:
@@ -199,11 +201,15 @@ if 'kmeans_n_clusters' not in st.session_state:
 if 'kmeans_max_iter' not in st.session_state:
     st.session_state.kmeans_max_iter = 300
 if 'aggl_n_clusters' not in st.session_state:
-    st.session_state.aggl_n_clusters = 2
+    st.session_state.aggl_n_clusters = None
 if 'aggl_metric' not in st.session_state:
     st.session_state.aggl_metric = 'euclidean'
 if 'aggl_linkage' not in st.session_state:
     st.session_state.aggl_linkage = 'ward'
+if 'aggl_compute_distances' not in st.session_state:
+    st.session_state.aggl_compute_distances = True
+if 'aggl_distance_threshold' not in st.session_state:
+    st.session_state.aggl_distance_threshold = 0
 
 # And finally the plotting options
 if 'label_columns' not in st.session_state:
@@ -240,7 +246,9 @@ has_embeddings = st.session_state.embeddings is not None
 has_reduction = bool(st.session_state.reduction_dict)
 has_metadata = st.session_state.metadata is not None
 if has_reduction:
-    has_clusters = st.session_state.reduction_dict[st.session_state.current_reduction]['clusters'] is not None
+    cr = st.session_state.current_reduction
+    has_clusters = st.session_state.reduction_dict[cr]['cluster_ids'] is not None
+    has_aggl = 'aggl' in list(st.session_state.reduction_dict[cr]['cluster_mods'].keys())
 else:
     has_reduction = False
 
@@ -288,12 +296,6 @@ with st.sidebar:
         st.button(label='Generate embeddings',
                   key='_embed_go',
                   on_click=oai.fetch_embeddings)
-        if st.session_state.embeddings is not None:
-            st.download_button(label='Download embeddings',
-                               data=st.session_state.embeddings.to_csv(index=False),
-                               file_name='embeddings.csv',
-                               mime='text/csv',
-                               key='_embed_save')
     with st.expander('Reduce', expanded=(not has_reduction) and
                      has_embeddings):
         st.selectbox(label='Method',
@@ -392,14 +394,14 @@ with st.sidebar:
                       values, the algorithm will find denser clusters, and \
                       at lower values, the clusters will be more sparser.')
         elif st.session_state.clustering_algorithm == 'k-means':
-            st.slider('Number of clusters',
+            st.number_input('Number of clusters',
                       min_value=1,
                       max_value=100,
                       key='_kmeans_n_clusters',
                       value=st.session_state.kmeans_n_clusters,
                       on_change=strml.update_settings,
                       kwargs={'keys': ['kmeans_n_clusters']})
-            st.slider('Max iterations',
+            st.number_input('Max iterations',
                       min_value=1,
                       max_value=500,
                       key='_kmeans_max_iter',
@@ -415,13 +417,6 @@ with st.sidebar:
                          placeholder=st.session_state.aggl_metric,
                          on_change=strml.update_settings,
                          kwargs={'keys': ['aggl_metric']})
-            st.slider('Number of clusters',
-                      min_value=2,
-                      max_value=100,
-                      key='_aggl_n_clusters',
-                      value=st.session_state.aggl_n_clusters,
-                      on_change=strml.update_settings,
-                      kwargs={'keys': ['aggl_n_clusters']})
             st.button('Show dendrogram',
                       on_click=generic.show_dendrogram)
         st.button('Run algorithm',
@@ -444,7 +439,7 @@ with st.sidebar:
                 if has_clusters:
                     display_cols += list(st.session_state.reduction_dict[
                         st.session_state.current_reduction
-                    ]['clusters'].columns.values)
+                    ]['cluster_ids'].columns.values)
                 if has_metadata:
                     display_cols += list(st.session_state.metadata.columns.values)
                 st.selectbox('Color points by',
@@ -502,6 +497,24 @@ with st.sidebar:
                   help='How tall you want the scatterplot to be. It will fill \
                   the width of the screen by default, but the height is \
                   adjustable.')
+    with st.expander('Download', expanded=False):
+        if has_embeddings:
+            st.download_button(label='Embeddings',
+                               data=st.session_state.embeddings.to_csv(index=False),
+                               file_name='embeddings.csv',
+                               mime='text/csv',
+                               key='_embed_save',
+                               help='Downloads the raw embeddings.')
+        if has_reduction:
+            cr = st.session_state.current_reduction
+            rd_df = st.session_state.reduction_dict[cr]['points'].to_csv(index=False)
+            st.download_button(label='Data reduction',
+                               data=rd_df,
+                               file_name=cr + '.csv',
+                               mime='text/csv',
+                               key='_reduc_save',
+                               help='Downloads the current reduction and its \
+                               cluster IDs.')
 
 # Making the main visualization
 with st.container(border=True):
@@ -518,11 +531,11 @@ with st.container(border=True):
             st.session_state.current_reduction
         ]
         display_data = current_reduc['points']
-        has_clusters = current_reduc['clusters'] is not None
+        has_clusters = current_reduc['cluster_ids'] is not None
         if has_clusters:
             algo = st.session_state.clustering_algorithm
-            cluster_cols = current_reduc['clusters'].columns.values
-            display_data[cluster_cols] = current_reduc['clusters'].values
+            cluster_cols = current_reduc['cluster_ids'].columns.values
+            display_data[cluster_cols] = current_reduc['cluster_ids'].values
         if has_metadata:
             display_data = pd.concat([display_data, st.session_state.metadata],
                                      axis=1)
