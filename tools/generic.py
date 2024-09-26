@@ -121,8 +121,16 @@ def run_clustering():
     return
 
 
+@st.dialog('Dendrogram')
 def show_dendrogram():
-    pass
+    current_reduc = st.session_state.current_reduction
+    if 'aggl' not in st.session_state.reduction_dict[current_reduc]['clusters']:
+        st.write('Please run the agglomerative clustering algorithm to see \
+                 a dendrogram.')
+    else:
+        make_dendrogram()
+    st.write('Hello!')
+
 
 
 def make_dendrogram(model):
@@ -143,11 +151,9 @@ def make_dendrogram(model):
         [model.children_, model.distances_, counts]
     ).astype(float)
 
-    # Plot the corresponding dendrogram
-    dendrogram(linkage_matrix)
-    
+    # Assemble the dendrogram
+
     # Make the plot
-    plt.title("Hierarchical Clustering Dendrogram")
-    plot_dendrogram(model, truncate_mode="level", p=3)
-    plt.xlabel("Number of points in node (or index of point if no parenthesis).")
-    st.session_state.dendrogram = plt
+    fig = plt.figure()
+    dn = dendrogram(linkage_matrix)
+    return fig

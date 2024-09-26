@@ -422,6 +422,8 @@ with st.sidebar:
                       value=st.session_state.aggl_n_clusters,
                       on_change=strml.update_settings,
                       kwargs={'keys': ['aggl_n_clusters']})
+            st.button('Show dendrogram',
+                      on_click=generic.show_dendrogram)
         st.button('Run algorithm',
                   on_click=generic.run_clustering)
     with st.expander('Visualize', expanded=has_reduction):

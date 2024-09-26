@@ -7,7 +7,6 @@ import os
 import pandas as pd
 import streamlit as st
 
-
 from tools.generic import compute_nn, reduce_dimensions
 
 
@@ -85,6 +84,9 @@ def load_file():
 
 
 def set_text():
+    """Adds the text to be embedded to the session state. Only applies when
+    tabular data is used for the input.
+    """
     st.session_state.text = [
         d for d in st.session_state.source_file[st.session_state._text_column]
     ]
@@ -92,15 +94,11 @@ def set_text():
     return
 
 
-def clear_source_files():
-    st.session_state.source_file = None
-    st.session_state.source_type = ''
-    st.session_state.source_texxt = ''
-    st.session_state.all_text = st.session_state.prompt
-    return
-
-
 def switch_reduction():
+    """Wrapper function for choosing a new data reduction. Kludgy, but
+    apparenty necessary for resetting the variable used to color points in
+    the main plot.
+    """
     update_settings(['current_reduction'])
     st.session_state.color_column = None
     return
