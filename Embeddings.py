@@ -373,8 +373,8 @@ with st.sidebar:
                      help='The algorithm to use for grouping the embeddings \
                      into clusters.')
         if st.session_state.clustering_algorithm == 'DBSCAN':
-            st.slider('Epsilon',
-                      min_value=0.01,
+            st.number_input('Epsilon',
+                      min_value=0.001,
                       max_value=10.0,
                       value=st.session_state.dbscan_eps,
                       on_change=strml.update_settings,
@@ -382,7 +382,7 @@ with st.sidebar:
                       kwargs={'keys': ['dbscan_eps']},
                       help='The maximum distance between two samples for one \
                       to be considered as in the neighborhood of the other.')
-            st.slider('Minimum samples',
+            st.number_input('Minimum samples',
                       min_value=1,
                       max_value=100,
                       value=st.session_state.dbscan_min_samples,
@@ -417,8 +417,6 @@ with st.sidebar:
                          placeholder=st.session_state.aggl_metric,
                          on_change=strml.update_settings,
                          kwargs={'keys': ['aggl_metric']})
-            st.button('Show dendrogram',
-                      on_click=generic.show_dendrogram)
         st.button('Run algorithm',
                   on_click=generic.run_clustering)
     with st.expander('Visualize', expanded=has_reduction):
