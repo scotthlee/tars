@@ -171,6 +171,15 @@ cluster_dict = {
         'params': ['eps', 'min_samples', 'n_jobs'],
         'param_abbrevs': ['eps', 'min_samp', 'n_jobs']
     },
+    'HDBSCAN': {
+        'sklearn_name': 'HDBSCAN',
+        'lower_name': 'hdbscan',
+        'params': [
+            'min_cluster_size', 'min_samples', 'cluster_selection_epsilon'],
+        'param_abrevs': [
+            'min_size', 'min_samp', 'eps',
+        ]
+    },
     'k-means': {
         'sklearn_name': 'KMeans',
         'lower_name': 'kmeans',
@@ -180,10 +189,14 @@ cluster_dict = {
     'Agglomerative': {
         'sklearn_name': 'AgglomerativeClustering',
         'lower_name': 'aggl',
-        'params': ['metric', 'linkage', 'n_clusters',
-                   'compute_distances', 'distance_threshold'],
-        'param_abbrevs': ['metric', 'link', 'comp_dist',
-                          'dist_thr']
+        'params': [
+            'metric', 'linkage', 'n_clusters',
+            'compute_distances', 'distance_threshold'
+        ],
+        'param_abbrevs': [
+        'metric', 'link', 'comp_dist',
+        'dist_thr'
+        ]
     }
 }
 if 'cluster_dict' not in st.session_state:
@@ -196,6 +209,12 @@ if 'dbscan_min_samples' not in st.session_state:
     st.session_state.dbscan_min_samples = 5
 if 'dbscan_n_jobs' not in st.session_state:
     st.session_state.dbscan_n_jobs = -1
+if 'hdbscan_min_cluster_size' not in st.session_state:
+    st.session_state.hdbscan_min_cluster_size = 5
+if 'hdbscan_min_samples' not in st.session_state:
+    st.session_state.hdbscan_min_samples = None
+if 'hdbscan_cluster_selection_epsilon' not in st.session_state:
+    st.session_state.hdbscan_cluster_selection_epsilon = 0.0
 if 'kmeans_n_clusters' not in st.session_state:
     st.session_state.kmeans_n_clusters = 8
 if 'kmeans_max_iter' not in st.session_state:
@@ -210,6 +229,8 @@ if 'aggl_compute_distances' not in st.session_state:
     st.session_state.aggl_compute_distances = True
 if 'aggl_distance_threshold' not in st.session_state:
     st.session_state.aggl_distance_threshold = 0
+if 'cluster_kwargs' not in st.session_state:
+    st.session_state.cluster_kwargs = {}
 
 # And finally the plotting options
 if 'label_columns' not in st.session_state:
@@ -372,7 +393,8 @@ with st.sidebar:
                      kwargs={'keys': ['clustering_algorithm']},
                      help='The algorithm to use for grouping the embeddings \
                      into clusters.')
-        if st.session_state.clustering_algorithm == 'DBSCAN':
+        current_algorithm = st.session_state.clustering_algorithm
+        if current_algorithm == 'DBSCAN':
             st.number_input('Epsilon',
                       min_value=0.001,
                       max_value=10.0,
@@ -393,7 +415,22 @@ with st.sidebar:
                       point to be considered as a core point. At higher \
                       values, the algorithm will find denser clusters, and \
                       at lower values, the clusters will be more sparser.')
-        elif st.session_state.clustering_algorithm == 'k-means':
+        elif current_algorithm == 'HDBSCAN':
+            st.number_input('Minimum cluster size',
+                            min_value=2,
+                            max_value=1000,
+                            key='_hdbscan_min_size',
+                            value=st.session_state.hdbscan_min_cluster_size,
+                            on_change=strml.update_settings,
+                            kwargs={'keys': ['hdbscan_min_cluster_size']})
+            st.number_input('Minimum samples',
+                            min_value=1,
+                            max_value=1000,
+                            key='_hdbscan_min_samples',
+                            value=st.session_state.hdbscan_min_samples,
+                            on_change=strml.update_settings,
+                            kwargs={'keys': ['hdbscan_min_samples']})
+        elif current_algorithm == 'k-means':
             st.number_input('Number of clusters',
                       min_value=1,
                       max_value=100,
@@ -408,7 +445,7 @@ with st.sidebar:
                       value=st.session_state.kmeans_max_iter,
                       on_change=strml.update_settings,
                       kwargs={'keys': ['kmeans_max_iter']})
-        elif st.session_state.clustering_algorithm == 'Agglomerative':
+        elif current_algorithm == 'Agglomerative':
             st.selectbox('Metric',
                          options=['euclidean', 'l1', 'l2',
                                   'manhattan', 'cosine'],
@@ -417,6 +454,11 @@ with st.sidebar:
                          placeholder=st.session_state.aggl_metric,
                          on_change=strml.update_settings,
                          kwargs={'keys': ['aggl_metric']})
+        st.text_input('Keyword arguments',
+                      key='_cluster_kwargs',
+                      value=st.session_state.cluster_kwargs,
+                      on_change=strml.update_settings,
+                      kwargs={'keys': ['cluster_kwargs']})
         st.button('Run algorithm',
                   on_click=generic.run_clustering)
     with st.expander('Visualize', expanded=has_reduction):

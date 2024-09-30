@@ -5,7 +5,7 @@ import streamlit as st
 
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
-from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering
+from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering, HDBSCAN
 from umap import UMAP
 from umap.umap_ import nearest_neighbors
 from scipy.cluster.hierarchy import dendrogram
@@ -108,10 +108,12 @@ def run_clustering():
     lower_name = cd[algo]['lower_name']
     kwargs = {p: st.session_state[lower_name + '_' + p]
               for p in cd[algo]['params']}
+    kwargs.update(st.session_state.cluster_kwargs)
     mod = globals()[mod_name](**kwargs)
     reduc_name = st.session_state.current_reduction
     with st.spinner('Running the clustering algorithm...'):
         mod.fit(st.session_state.reduction_dict[reduc_name]['points'])
+    centers = None
     if algo == 'DBSCAN':
         centers = mod.core_sample_indices_
     elif algo == 'KMeans':
