@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import openai
 import streamlit as st
+import io
 
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
@@ -143,7 +144,7 @@ def show_dendrogram():
 
 
 
-def make_dendrogram(model):
+def make_dendrogram(model, as_bytes=True):
     # Create linkage matrix and then plot the dendrogram
     # create the counts of samples under each node
     counts = np.zeros(model.children_.shape[0])

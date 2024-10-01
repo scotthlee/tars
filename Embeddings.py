@@ -3,10 +3,12 @@ import pandas as pd
 import streamlit as st
 import openai
 import os
+import io
 import plotly.express as px
 import zipfile
 
 from dotenv import load_dotenv
+from matplotlib import pyplot as plt
 from azure.identity import ClientSecretCredential
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
@@ -437,14 +439,18 @@ with st.sidebar:
                       key='_kmeans_n_clusters',
                       value=st.session_state.kmeans_n_clusters,
                       on_change=strml.update_settings,
-                      kwargs={'keys': ['kmeans_n_clusters']})
+                      kwargs={'keys': ['kmeans_n_clusters']},
+                      help='The number of clusters to form, as well as the \
+                      number of centroids to generate.')
             st.number_input('Max iterations',
                       min_value=1,
                       max_value=500,
                       key='_kmeans_max_iter',
                       value=st.session_state.kmeans_max_iter,
                       on_change=strml.update_settings,
-                      kwargs={'keys': ['kmeans_max_iter']})
+                      kwargs={'keys': ['kmeans_max_iter']},
+                      help='The maximum number of iterations for the algorithm \
+                      to run.')
         elif current_algorithm == 'Agglomerative':
             st.selectbox('Metric',
                          options=['euclidean', 'l1', 'l2',
@@ -458,7 +464,13 @@ with st.sidebar:
                       key='_cluster_kwargs',
                       value=st.session_state.cluster_kwargs,
                       on_change=strml.update_settings,
-                      kwargs={'keys': ['cluster_kwargs']})
+                      kwargs={'keys': ['cluster_kwargs']},
+                      help="Extra arguments to pass to the scikit-learn \
+                      clustering model. Should be formatted as a Python \
+                      dictionary, e.g., {'kw': 'kw_value'}. Note: the app will \
+                      not check whether these are correct before attempting \
+                      to run the algorithm, so incorrect entries may crash the \
+                      current session.")
         st.button('Run algorithm',
                   on_click=generic.run_clustering)
     with st.expander('Visualize', expanded=has_reduction):
@@ -555,10 +567,21 @@ with st.sidebar:
                                key='_reduc_save',
                                help='Downloads the current reduction and its \
                                cluster IDs.')
+            if has_aggl:
+                sd = st.session_state.reduction_dict
+                mod = sd[cr]['cluster_mods']['aggl']
+                fig = generic.make_dendrogram(mod)
+                buf = io.BytesIO()
+                fig.savefig(buf, format='svg')
+                st.download_button(label='Dendrogram',
+                                   data=buf,
+                                   mime='image/svg',
+                                   file_name='dendrogram.svg',
+                                   help='Downloads the clustering dendrogram.')
 
 # Making the main visualization
 with st.container(border=True):
-    if bool(st.session_state.reduction_dict):
+    if has_reduction:
         # Construct the hover columns
         hover_data = st.session_state.hover_data
         if st.session_state.hover_columns is not None:
