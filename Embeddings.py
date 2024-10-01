@@ -303,10 +303,10 @@ with st.sidebar:
             key='_embedding_type',
             on_change=strml.update_settings,
             kwargs={'keys': ['embedding_type']},
-            options=['document', 'word'],
+            options=['document', 'sentence'],
             help="Whether you'd like to make embeddings for each 'document' \
             in your dataset (documents being text contained by a single \
-            spreadhseet cell) or for the words in all the documents.",
+            spreadhseet cell) or for the sentences in all the documents.",
             disabled=True
         )
         st.selectbox(
@@ -314,7 +314,9 @@ with st.sidebar:
             key='_embedding_model',
             on_change=strml.update_settings,
             kwargs={'keys': ['embedding_model']},
-            options=['ada-002']
+            options=['ada-002'],
+            help='The model that will generate the embeddings. For more info \
+            about the different models, see the README.'
         )
         st.button(label='Generate embeddings',
                   key='_embed_go',
