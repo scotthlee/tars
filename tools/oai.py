@@ -1,12 +1,8 @@
 import openai
 import streamlit as st
-import numpy as np
-import pandas as pd
+
 
 from azure.identity import ClientSecretCredential
-from umap.umap_ import nearest_neighbors
-
-from tools.generic import reduce_dimensions, compute_nn
 
 
 def load_openai_settings(mode='chat'):
@@ -21,25 +17,4 @@ def load_openai_settings(mode='chat'):
     openai.api_key = options['key']
     openai.api_type = st.session_state.api_type
     openai.api_version = st.session_state.api_version
-    return
-
-
-def fetch_embeddings():
-    """Generates embeddings for the user's text, along with the associated \
-    PCA reduction for initial visualization."""
-    if st.session_state.embedding_type == 'openai':
-        load_openai_settings(mode='embeddings')
-        text = st.session_state.text[0:2000]
-        with st.spinner('Fetching the embeddings...'):
-            response = openai.Embedding.create(
-                input=text,
-                engine=st.session_state.embedding_engine,
-            )
-        embeddings = np.array([response['data'][i]['embedding']
-                  for i in range(len(text))])
-    if st.session_state.embedding_type == 'huggingface':
-        pass
-    st.session_state.embeddings = pd.DataFrame(embeddings)
-    compute_nn()
-    reduce_dimensions(reduction_method='PCA')
     return

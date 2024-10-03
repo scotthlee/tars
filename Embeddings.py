@@ -14,7 +14,7 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from umap import UMAP
 
-from tools import oai, generic, strml
+from tools import oai, data, text, strml
 
 
 # Fire up the page
@@ -103,7 +103,7 @@ if 'embedding_engine' not in st.session_state:
 if 'embedding_model' not in st.session_state:
     st.session_state.embedding_model = openai_defaults['embeddings']['model']
 if 'embedding_type' not in st.session_state:
-    st.session_state['embedding_type'] = 'openai'
+    st.session_state['embedding_type'] = 'document'
 if 'embeddings' not in st.session_state:
     st.session_state.embeddings = None
 
@@ -293,7 +293,7 @@ with st.sidebar:
         if st.session_state.source_file is not None:
             st.selectbox('Text Column',
                          key='_text_column',
-                         index=None,
+                         index=st.session_state.text_column,
                          options=st.session_state.source_file.columns.values,
                          on_change=strml.set_text,
                          help="Choose the column in your dataset holding the \
@@ -306,8 +306,7 @@ with st.sidebar:
             options=['document', 'sentence'],
             help="Whether you'd like to make embeddings for each 'document' \
             in your dataset (documents being text contained by a single \
-            spreadhseet cell) or for the sentences in all the documents.",
-            disabled=True
+            spreadhseet cell) or for the sentences in all the documents."
         )
         st.selectbox(
             label='Model',
@@ -320,7 +319,7 @@ with st.sidebar:
         )
         st.button(label='Generate embeddings',
                   key='_embed_go',
-                  on_click=oai.fetch_embeddings)
+                  on_click=text.fetch_embeddings)
     with st.expander('Reduce', expanded=(not has_reduction) and
                      has_embeddings):
         st.selectbox(label='Method',
@@ -386,7 +385,7 @@ with st.sidebar:
                   help='Whether to reduce the embeddings to 3 dimensions \
                   (instead of 2).')
         st.button('Start Reduction',
-                  on_click=generic.reduce_dimensions)
+                  on_click=data.reduce_dimensions)
     with st.expander('Cluster', expanded=has_reduction):
         st.selectbox('Algorithm',
                      options=list(cluster_dict.keys()),
@@ -423,7 +422,7 @@ with st.sidebar:
             st.number_input('Minimum cluster size',
                             min_value=2,
                             max_value=1000,
-                            key='_hdbscan_min_size',
+                            key='_hdbscan_min_cluster_size',
                             value=st.session_state.hdbscan_min_cluster_size,
                             on_change=strml.update_settings,
                             kwargs={'keys': ['hdbscan_min_cluster_size']})
@@ -474,7 +473,7 @@ with st.sidebar:
                       to run the algorithm, so incorrect entries may crash the \
                       current session.")
         st.button('Run algorithm',
-                  on_click=generic.run_clustering)
+                  on_click=data.run_clustering)
     with st.expander('Visualize', expanded=has_reduction):
         if bool(st.session_state.reduction_dict):
             st.selectbox('Choose a reduction',
@@ -572,7 +571,7 @@ with st.sidebar:
             if has_aggl:
                 sd = st.session_state.reduction_dict
                 mod = sd[cr]['cluster_mods']['aggl']
-                fig = generic.make_dendrogram(mod)
+                fig = data.make_dendrogram(mod)
                 buf = io.BytesIO()
                 fig.savefig(buf, format='svg')
                 st.download_button(label='Dendrogram',

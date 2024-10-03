@@ -7,7 +7,7 @@ import os
 import pandas as pd
 import streamlit as st
 
-from tools.generic import compute_nn, reduce_dimensions
+from tools.data import compute_nn, reduce_dimensions
 
 
 def keep(key):
@@ -87,10 +87,13 @@ def set_text():
     """Adds the text to be embedded to the session state. Only applies when
     tabular data is used for the input.
     """
-    st.session_state.text = [
-        d for d in st.session_state.source_file[st.session_state._text_column]
-    ]
-    st.session_state.hover_columns = [st.session_state._text_column]
+    text_col = st.session_state._text_column
+    sf = st.session_state.source_file.dropna(axis=0, subset=text_col)
+    sf[text_col] = sf[text_col].astype(str)
+    docs = [str(d) for d in sf[text_col]]
+    st.session_state.text = {'documents': docs, 'sentences': None}
+    st.session_state.hover_columns = [text_col]
+    st.session_state.source_file = sf
     return
 
 
