@@ -53,11 +53,9 @@ class ClusterModel:
         elif algo == 'KMeans':
             self.centers = mod.cluster_centers_
         labels = np.array(mod.labels_).astype(str)
-        label_df[lower_name + '_id'] = labels
-        self.labels = label_df
+        self.labels = pd.DataFrame(labels, columsn=[lower_name + '_id'])
         self.model = mod
         return
-
 
 
 class EmbeddingReduction:
@@ -104,14 +102,7 @@ class EmbeddingReduction:
             self.label_df[mod.labels.columns.values] = mod.labels
         return
 
-    def reduce(self, X,
-               precomputed_knn=None,
-               n_neighbors=None,
-               min_dist=None,
-               n_iter=None,
-               perplexity=None,
-               kwargs={}
-               ):
+    def fit(self, X, main_kwargs={}, aux_kwargs={}):
         """Performs dimensionality reduction on a set of embeddings. \
         Algorithm options are PCA, UMAP, and t-SNE."""
         reduction_method = self.method
@@ -119,52 +110,15 @@ class EmbeddingReduction:
         if reduction_method == 'PCA':
             reducer = PCA(n_components=dims)
         elif reduction_method == 'UMAP':
-            reducer = UMAP(n_components=dims,
-                           precomputed_knn=precomputed_knn,
-                           n_neighbors=n_neighbors,
-                           min_dist=min_dist)
+            reducer = UMAP(**main_kwargsm, **aux_kwargs)
         elif reduction_method == 't-SNE':
-            reducer = TSNE(n_components=dims,
-                           perplexity=perplexity,
-                           n_iter=n_iter)
+            reducer = TSNE(**main_kwargs, **aux_kwargs)
         with st.spinner('Running ' + reduction_method + '...'):
-            reduction = reducer.fit_transform(X, **kwargs)
+            reduction = reducer.fit_transform(X)
         colnames = ['d' + str(i + 1) for i in range(dims)]
         self.points = pd.DataFrame(reduction, columns=colnames)
-        self.name_reduction()
+        self.name_reduction(list(main_kwargs.values))
         return
-
-
-
-def run_clustering():
-    """Runs a cluster analysis on the user's chosen reduction. Cluster IDs and \
-    centers are saved to the reduction's dictionary entry for plotting.
-    """
-    algo = st.session_state.clustering_algorithm
-    cd = st.session_state.cluster_dict
-    mod_name = cd[algo]['sklearn_name']
-    lower_name = cd[algo]['lower_name']
-    kwargs = {p: st.session_state[lower_name + '_' + p]
-              for p in cd[algo]['params']}
-    kwargs.update(st.session_state.cluster_kwargs)
-    mod = globals()[mod_name](**kwargs)
-    reduc_name = st.session_state.current_reduction
-    with st.spinner('Running the clustering algorithm...'):
-        mod.fit(st.session_state.reduction_dict[reduc_name]['points'])
-    centers = None
-    if algo == 'DBSCAN':
-        centers = mod.core_sample_indices_
-    elif algo == 'KMeans':
-        centers = mod.cluster_centers_
-    cluster_df = st.session_state.reduction_dict[reduc_name]['cluster_ids']
-    labels = np.array(mod.labels_).astype(str)
-    if cluster_df is not None:
-        cluster_df[lower_name + '_id'] = labels
-    else:
-        cluster_df = pd.DataFrame(mod.labels_, columns=[lower_name + '_id'])
-    st.session_state.reduction_dict[reduc_name]['cluster_ids'] = cluster_df.astype(str)
-    st.session_state.reduction_dict[reduc_name]['cluster_mods'].update({lower_name: mod})
-    return
 
 
 @st.dialog('Dendrogram')

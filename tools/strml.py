@@ -8,6 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from tools.data import compute_nn, reduce_dimensions
+from tools.text import TextData
 
 
 def keep(key):
@@ -91,9 +92,43 @@ def set_text():
     sf = st.session_state.source_file.dropna(axis=0, subset=text_col)
     sf[text_col] = sf[text_col].astype(str)
     docs = [str(d) for d in sf[text_col]]
-    st.session_state.text = {'documents': docs, 'sentences': None}
+    text_type = st.session_state.embedding_type
+    td = TextData(docs)
+    st.session_state.current_text_data = td
+    st.session_state.text_data_dict.update({text_type: td})
     st.session_state.hover_columns = [text_col]
     st.session_state.source_file = sf
+    return
+
+
+def reduce_dimensions():
+    """Reduces the dimensonality of the currently-chosen embeddings."""
+    td = st.session_state.current_text_data
+    method = st.session_state.reduction_method
+    rd = st.session_state.reduction_dict
+    method_low = rd[method]['lower_name']
+    kwargs = {p: st.session_state[method_low + '_' + p]
+              for p in rd[method]['params']}
+    dimensions = st.session_state.reduction_dimensions
+    td.reduce(method=method, dimensions=dimensions, kwargs=kwargs)
+    return
+
+
+def run_clustering():
+    """Runs a cluster analysis on the user's chosen reduction. Cluster IDs and \
+    centers are saved to the reduction's dictionary entry for plotting.
+    """
+    algo = st.session_state.clustering_algorithm
+    cd = st.session_state.cluster_dict
+    mod_name = cd[algo]['sklearn_name']
+    lower_name = cd[algo]['lower_name']
+    kwargs = {p: st.session_state[lower_name + '_' + p]
+              for p in cd[algo]['params']}
+    kwargs.update(st.session_state.cluster_kwargs)
+    td = st.session_state.current_text_data
+    td.cluster(reduction=st.session_state.current_reduction,
+               method=algo,
+               kwargs=kwargs)
     return
 
 

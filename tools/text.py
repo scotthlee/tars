@@ -13,17 +13,20 @@ from tools import oai, data
 
 
 class TextData:
-    def __init__(self, docs):
+    def __init__(self,
+                 docs=None,
+                 metadata=None,
+                 embeddings=None):
         self.text = docs
-        self.embeddings = None
+        self.metadata = metadata
+        self.embeddings = embeddings
         self.reductions = {}
 
     def embed(self,
-              model_type='openai',
               model_name='ada-002',
               engine='text-embedding-ada-002'):
         """Embeds the object's text."""
-        if model_type == 'openai':
+        if model_name == 'ada-002':
             oai.load_openai_settings(mode='embeddings')
             with st.spinner('Fetching the embeddings...'):
                 response = openai.Embedding.create(
@@ -40,10 +43,15 @@ class TextData:
     def reduce(self,
                method='UMAP',
                dimensions=3,
-               kwargs={}):
+               main_kwargs={},
+               aux_kwargs={}):
         reducer = data.EmbeddingReduction(method=method,
                                           dimensions=dimensions)
-        reducer.fit(self.embeddings, kwargs=kwargs)
+        reducer.fit(self.embeddings,
+                    precomputed_knn=self.precomputed_knn,
+                    main_kwargs=main_kwargs,
+                    aux_kwargs=aux_kwargs)
+        st.write(reducer.name)
         self.reductions.update({reducer.name: reducer})
         return
 
@@ -68,34 +76,14 @@ def docs_to_sents():
     sents_flat = [s for l in sents for s in l]
     rows = [[i] * len(l) for i, l in enumerate(sents)]
     rows_flat = [r for l in rows for r in l]
-
-    st.session_state.text.update({'sentences': sents})
     return
 
 
 def fetch_embeddings():
     """Generates embeddings for the user's text, along with the associated \
     PCA reduction for initial visualization."""
-    if st.session_state.embedding_type == 'sentences':
-        if st.session_state.text['sentences'] is None:
-            docs_to_sents()
-        text = st.session_state.text['sentences'][0:2000]
-    else:
-        text = st.session_state.text['documents'][0:2000]
-    if st.session_state.embedding_model == 'ada-002':
-        oai.load_openai_settings(mode='embeddings')
-        with st.spinner('Fetching the embeddings...'):
-            response = openai.Embedding.create(
-                input=text,
-                engine=st.session_state.embedding_engine,
-            )
-        embeddings = np.array([response['data'][i]['embedding']
-                  for i in range(len(text))])
-    if st.session_state.embedding_type == 'huggingface':
-        pass
-    st.session_state.embeddings = pd.DataFrame(embeddings)
-    data.compute_nn()
-    data.reduce_dimensions(reduction_method='PCA')
+    td = st.session_state.text_data_dict[st.session_state.embedding_type]
+    td.embed(model_name=st.session_state.embedding_model)
     return
 
 
