@@ -67,7 +67,7 @@ class EmbeddingReduction:
         self.label_df = None
         self.cluster_models = {}
 
-    def name(self, param_vals):
+    def name_reduction(self, param_vals):
         """Generates a string name for a particular reduction."""
         param_dict = {
             'UMAP': {
@@ -84,17 +84,19 @@ class EmbeddingReduction:
         if self.method != 'PCA':
             curr_name = param_dict[self.method]['name']
             param_abbrevs = param_dict[self.method]['param_abbrevs']
-            param_str = ', '.join([param_abbrevs[i] + '=' + param_vals[i]
+            param_str = ', '.join([param_abbrevs[i] + '=' + str(param_vals[i])
                                    for i in range(len(param_vals))])
-            name_str = curr_method + '(' + param_str + ')'
+            name_str = self.method + '(' + param_str + ')'
         else:
             name_str = 'PCA'
         self.name = name_str
 
-    def cluster(self, method='HDBSCAN', kwargs={}):
+    def cluster(self, method='HDBSCAN', main_kwargs={}, aux_kwargs={}):
         """Adds a ClusterModel to the current reduction."""
         mod = ClusterModel(model_name=method)
-        mod.fit(self.points, kwargs=kwargs)
+        mod.fit(self.points,
+                main_kwargs=main_kwargs,
+                aux_kwargs=aux_kwargs)
         self.cluster_models.update({mod.name: mod})
         if self.label_df is None:
             self.label_df = mod.labels
@@ -110,14 +112,18 @@ class EmbeddingReduction:
         if reduction_method == 'PCA':
             reducer = PCA(n_components=dims)
         elif reduction_method == 'UMAP':
-            reducer = UMAP(**main_kwargsm, **aux_kwargs)
+            reducer = UMAP(n_components=dims,
+                           **main_kwargs,
+                           **aux_kwargs)
         elif reduction_method == 't-SNE':
-            reducer = TSNE(**main_kwargs, **aux_kwargs)
+            reducer = TSNE(n_components=dims,
+                           **main_kwargs,
+                           **aux_kwargs)
         with st.spinner('Running ' + reduction_method + '...'):
             reduction = reducer.fit_transform(X)
         colnames = ['d' + str(i + 1) for i in range(dims)]
         self.points = pd.DataFrame(reduction, columns=colnames)
-        self.name_reduction(list(main_kwargs.values))
+        self.name_reduction(list(main_kwargs.values()))
         return
 
 
@@ -160,7 +166,7 @@ def make_dendrogram(model, as_bytes=True):
     return fig
 
 
-def compute_nn(embeddings=st.session_state.embeddings):
+def compute_nn(embeddings):
     """Pre-computes the nearest neighbors graph for UMAP."""
     with st.spinner('Calculating nearest neighbors...'):
         nn = nearest_neighbors(embeddings,

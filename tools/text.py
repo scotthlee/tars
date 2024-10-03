@@ -21,6 +21,7 @@ class TextData:
         self.metadata = metadata
         self.embeddings = embeddings
         self.reductions = {}
+        self.last_reduction = None
 
     def embed(self,
               model_name='ada-002',
@@ -48,11 +49,11 @@ class TextData:
         reducer = data.EmbeddingReduction(method=method,
                                           dimensions=dimensions)
         reducer.fit(self.embeddings,
-                    precomputed_knn=self.precomputed_knn,
                     main_kwargs=main_kwargs,
                     aux_kwargs=aux_kwargs)
         st.write(reducer.name)
         self.reductions.update({reducer.name: reducer})
+        self.last_reduction = reducer.name
         return
 
     def cluster(self,

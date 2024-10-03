@@ -110,7 +110,8 @@ def reduce_dimensions():
     kwargs = {p: st.session_state[method_low + '_' + p]
               for p in rd[method]['params']}
     dimensions = st.session_state.reduction_dimensions
-    td.reduce(method=method, dimensions=dimensions, kwargs=kwargs)
+    td.reduce(method=method, dimensions=dimensions, main_kwargs=kwargs)
+    st.session_state.current_reduction = td.last_reduction
     return
 
 
@@ -124,11 +125,12 @@ def run_clustering():
     lower_name = cd[algo]['lower_name']
     kwargs = {p: st.session_state[lower_name + '_' + p]
               for p in cd[algo]['params']}
-    kwargs.update(st.session_state.cluster_kwargs)
+    aux_kwargs = st.session_state.cluster_kwargs
     td = st.session_state.current_text_data
     td.cluster(reduction=st.session_state.current_reduction,
                method=algo,
-               kwargs=kwargs)
+               main_kwargs=main_kwargs,
+               aux_kwargs=aux_kwargs)
     return
 
 

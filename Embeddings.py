@@ -298,8 +298,8 @@ if td is not None:
     has_metadata = st.session_state.metadata is not None
     if has_reduction:
         cr = st.session_state.current_reduction
-        has_clusters = td.reductions[cr]['label_df'] is not None
-        has_aggl = 'aggl' in list(td.reductions[cr]['cluster_mods'].keys())
+        has_clusters = td.reductions[cr].label_df is not None
+        has_aggl = 'aggl' in list(td.reductions[cr].cluster_models.keys())
     else:
         has_reduction = False
 else:
@@ -593,7 +593,7 @@ with st.sidebar:
                                help='Downloads the raw embeddings.')
         if has_reduction:
             cr = st.session_state.current_reduction
-            rd_df = td.reductions[cr]['points'].to_csv(index=False)
+            rd_df = td.reductions[cr].points.to_csv(index=False)
             st.download_button(label='Data reduction',
                                data=rd_df,
                                file_name=cr + '.csv',
@@ -624,15 +624,13 @@ with st.container(border=True):
             )
 
         # Assemble any metadata
-        current_reduc = st.session_state.reduction_dict[
-            st.session_state.current_reduction
-        ]
-        display_data = current_reduc['points']
-        has_clusters = current_reduc['cluster_ids'] is not None
+        current_reduc = td.reductions[st.session_state.current_reduction]
+        display_data = current_reduc.points
+        has_clusters = current_reduc.label_df is not None
         if has_clusters:
             algo = st.session_state.clustering_algorithm
-            cluster_cols = current_reduc['cluster_ids'].columns.values
-            display_data[cluster_cols] = current_reduc['cluster_ids'].values
+            cluster_cols = current_reduc.label_df.columns.values
+            display_data[cluster_cols] = current_reduc.label_df.values
         if has_metadata:
             display_data = pd.concat([display_data, st.session_state.metadata],
                                      axis=1)
