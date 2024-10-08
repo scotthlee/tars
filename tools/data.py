@@ -6,6 +6,7 @@ import streamlit as st
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from sklearn.cluster import KMeans, DBSCAN, HDBSCAN, AgglomerativeClustering
+from sklearn.preprocessing import normalize, scale
 from umap import UMAP
 from umap.umap_ import nearest_neighbors
 from matplotlib import pyplot as plt
@@ -106,21 +107,23 @@ class EmbeddingReduction:
             self.label_df[mod.labels.columns.values] = mod.labels
         return
 
-    def fit(self, X, main_kwargs={}, aux_kwargs={}):
+    def fit(self, X,
+            do_scale=False,
+            main_kwargs={},
+            aux_kwargs={}):
         """Performs dimensionality reduction on a set of embeddings. \
         Algorithm options are PCA, UMAP, and t-SNE."""
         reduction_method = self.method
         dims = self.dimensions
+        kwargs = {**main_kwargs, **aux_kwargs}
+        if do_scale:
+            X = scale(X)
         if reduction_method == 'PCA':
             reducer = PCA(n_components=dims)
         elif reduction_method == 'UMAP':
-            reducer = UMAP(n_components=dims,
-                           **main_kwargs,
-                           **aux_kwargs)
+            reducer = UMAP(n_components=dims, **kwargs)
         elif reduction_method == 't-SNE':
-            reducer = TSNE(n_components=dims,
-                           **main_kwargs,
-                           **aux_kwargs)
+            reducer = TSNE(n_components=dims, **kwargs)
         with st.spinner('Running ' + reduction_method + '...'):
             reduction = reducer.fit_transform(X)
         colnames = ['d' + str(i + 1) for i in range(dims)]
@@ -168,17 +171,18 @@ def make_dendrogram(model, as_bytes=True):
     return fig
 
 
-def compute_nn(embeddings):
+def compute_nn(embeddings,
+               n_neighbors=250,
+               metric='euclidean'):
     """Pre-computes the nearest neighbors graph for UMAP."""
     with st.spinner('Calculating nearest neighbors...'):
         nn = nearest_neighbors(embeddings,
-                               n_neighbors=250,
-                               metric='euclidean',
+                               n_neighbors=n_neighbors,
+                               metric=metric,
                                metric_kwds=None,
                                angular=False,
                                random_state=None)
-    st.session_state.precomputed_nn = nn
-    return
+    return nn
 
 
 def reduce_dimensions(reduction_method=None):

@@ -141,8 +141,7 @@ if 'data_type_dict' not in st.session_state:
     st.session_state.data_type_dict = {
         'Tabular data with text column': ['csv'],
         'Bulk documents': ['pdf', 'txt'],
-        'Premade embeddings': ['csv', 'tsv'],
-        'Metadata': ['csv']
+        'Premade embeddings': ['csv', 'tsv']
     }
 
 # Setting up the dimensionality reduction options
@@ -209,17 +208,14 @@ cluster_dict = {
     'DBSCAN': {
         'sklearn_name': 'DBSCAN',
         'lower_name': 'dbscan',
-        'params': ['eps', 'min_samples', 'n_jobs'],
-        'param_abbrevs': ['eps', 'min_samp', 'n_jobs']
+        'params': ['eps', 'min_samples'],
+        'param_abbrevs': ['eps', 'min_samp']
     },
     'HDBSCAN': {
         'sklearn_name': 'HDBSCAN',
         'lower_name': 'hdbscan',
-        'params': [
-            'min_cluster_size', 'min_samples', 'cluster_selection_epsilon'],
-        'param_abrevs': [
-            'min_size', 'min_samp', 'eps',
-        ]
+        'params': ['min_cluster_size', 'min_samples'],
+        'param_abrevs': ['min_size', 'min_samp']
     },
     'k-means': {
         'sklearn_name': 'KMeans',
@@ -289,13 +285,14 @@ for key in to_load:
         strml.unkeep(key)
 
 # Specifying the current text data object for shorthand
-td = st.session_state.current_text_data
+td_name = st.session_state.current_text_data
 
 # Some bools for controlling menu expansions
-if td is not None:
+if td_name is not None:
+    td = st.session_state.text_data_dict[td_name]
     has_embeddings = td.embeddings is not None
     has_reduction = bool(td.reductions)
-    has_metadata = st.session_state.metadata is not None
+    has_metadata = td.metadata is not None
     if has_reduction:
         cr = st.session_state.current_reduction
         has_clusters = td.reductions[cr].label_df is not None
@@ -310,7 +307,7 @@ else:
     has_aggl = False
 
 with st.sidebar:
-    with st.expander(label='Load', expanded=not has_embeddings):
+    with st.expander('Load', expanded=not has_embeddings):
         st.radio('What kind of data do you want to load?',
                  options=list(st.session_state.data_type_dict.keys()),
                  key='_data_type',
@@ -365,61 +362,50 @@ with st.sidebar:
                      kwargs={'keys': ['reduction_method']},
                      help='The algorithm used to reduce the dimensionality \
                      of the embeddings to make them viewable in 2- or 3-D.')
-        if st.session_state.reduction_method == 'UMAP':
-            st.slider('Nearest neighbors',
-                      min_value=2,
-                      max_value=200,
-                      value=st.session_state.umap_n_neighbors,
-                      key='_umap_n_neighbors',
-                      on_change=strml.update_settings,
-                      kwargs={'keys': ['umap_n_neighbors']},
-                      help='This parameter controls how UMAP balances \
-                      local versus global structure. Low values will force \
-                      UMAP to concentrate on very local structure, while \
-                      large values will push UMAP to look at larger \
-                      neighborhoods of each point when estimating \
-                      the mainfold structure of the data.')
-            st.slider('Minimum distance',
-                      min_value=0.0,
-                      max_value=1.0,
-                      step=0.001,
-                      value=st.session_state.umap_min_dist,
-                      key='_umap_min_dist',
-                      on_change=strml.update_settings,
-                      kwargs={'keys': ['umap_min_dist']},
-                      help='Controls how tightly UMAP is allowed to pack \
-                      points together.')
-        if st.session_state.reduction_method == 't-SNE':
-            st.slider('Perplexity',
-                      min_value=5.0,
-                      max_value=50.0,
-                      value=st.session_state.tsne_perplexity,
-                      key='_tsne_perplexity',
-                      on_change=strml.update_settings,
-                      kwargs={'keys': ['tsne_perplexity']})
-            st.slider('Learning rate',
-                      min_value=100.00,
-                      max_value=1000.00,
-                      value=st.session_state.tsne_learning_rate,
-                      key='_tsne_learning_rate',
-                      on_change=strml.update_settings,
-                      kwargs={'keys': ['tsne_learning_rate']})
-            st.slider('Number of iterations',
-                      min_value=200,
-                      max_value=10000,
-                      value=st.session_state.tsne_n_iter,
-                      key='_tsne_n_iter',
-                      on_change=strml.update_settings,
-                      kwargs={'keys': ['tsne_n_iter']})
-        st.toggle(label='3D',
-                  key='_map_in_3d',
-                  value=st.session_state.map_in_3d,
-                  on_change=strml.update_settings,
-                  kwargs={'keys': ['map_in_3d']},
-                  help='Whether to reduce the embeddings to 3 dimensions \
-                  (instead of 2).')
-        st.button('Start Reduction',
-                  on_click=strml.reduce_dimensions)
+        with st.form('_reduce_param_form', border=False):
+            if st.session_state.reduction_method == 'UMAP':
+                st.slider('Nearest neighbors',
+                          min_value=2,
+                          max_value=200,
+                          key='_umap_n_neighbors',
+                          value=st.session_state.umap_n_neighbors,
+                          help='This parameter controls how UMAP balances \
+                          local versus global structure. Low values will force \
+                          UMAP to concentrate on very local structure, while \
+                          large values will push UMAP to look at larger \
+                          neighborhoods of each point when estimating \
+                          the mainfold structure of the data.')
+                st.slider('Minimum distance',
+                          min_value=0.0,
+                          max_value=1.0,
+                          step=0.001,
+                          value=st.session_state.umap_min_dist,
+                          key='_umap_min_dist',
+                          help='Controls how tightly UMAP is allowed to pack \
+                          points together.')
+            if st.session_state.reduction_method == 't-SNE':
+                st.slider('Perplexity',
+                          min_value=5.0,
+                          max_value=50.0,
+                          value=st.session_state.tsne_perplexity,
+                          key='_tsne_perplexity')
+                st.slider('Learning rate',
+                          min_value=100.00,
+                          max_value=1000.00,
+                          value=st.session_state.tsne_learning_rate,
+                          key='_tsne_learning_rate')
+                st.slider('Number of iterations',
+                          min_value=200,
+                          max_value=10000,
+                          value=st.session_state.tsne_n_iter,
+                          key='_tsne_n_iter')
+            st.toggle(label='3D',
+                      key='_map_in_3d',
+                      value=st.session_state.map_in_3d,
+                      help='Whether to reduce the embeddings to 3 dimensions \
+                      (instead of 2).')
+            st.form_submit_button('Start Reduction',
+                      on_click=strml.reduce_dimensions)
     with st.expander('Cluster', expanded=has_reduction):
         st.selectbox('Algorithm',
                      options=list(cluster_dict.keys()),
@@ -431,82 +417,70 @@ with st.sidebar:
                      help='The algorithm to use for grouping the embeddings \
                      into clusters.')
         current_algorithm = st.session_state.clustering_algorithm
-        if current_algorithm == 'DBSCAN':
-            st.number_input('Epsilon',
-                      min_value=0.001,
-                      max_value=10.0,
-                      value=st.session_state.dbscan_eps,
-                      on_change=strml.update_settings,
-                      key='_dbscan_eps',
-                      kwargs={'keys': ['dbscan_eps']},
-                      help='The maximum distance between two samples for one \
-                      to be considered as in the neighborhood of the other.')
-            st.number_input('Minimum samples',
-                      min_value=1,
-                      max_value=100,
-                      value=st.session_state.dbscan_min_samples,
-                      on_change=strml.update_settings,
-                      key='_dbscan_min_samples',
-                      kwargs={'keys': ['dbscan_min_samples']},
-                      help='The number of samples in a neighborhood for a \
-                      point to be considered as a core point. At higher \
-                      values, the algorithm will find denser clusters, and \
-                      at lower values, the clusters will be more sparser.')
-        elif current_algorithm == 'HDBSCAN':
-            st.number_input('Minimum cluster size',
-                            min_value=2,
-                            max_value=1000,
-                            key='_hdbscan_min_cluster_size',
-                            value=st.session_state.hdbscan_min_cluster_size,
-                            on_change=strml.update_settings,
-                            kwargs={'keys': ['hdbscan_min_cluster_size']})
-            st.number_input('Minimum samples',
-                            min_value=1,
-                            max_value=1000,
-                            key='_hdbscan_min_samples',
-                            value=st.session_state.hdbscan_min_samples,
-                            on_change=strml.update_settings,
-                            kwargs={'keys': ['hdbscan_min_samples']})
-        elif current_algorithm == 'k-means':
-            st.number_input('Number of clusters',
-                      min_value=1,
-                      max_value=100,
-                      key='_kmeans_n_clusters',
-                      value=st.session_state.kmeans_n_clusters,
-                      on_change=strml.update_settings,
-                      kwargs={'keys': ['kmeans_n_clusters']},
-                      help='The number of clusters to form, as well as the \
-                      number of centroids to generate.')
-            st.number_input('Max iterations',
-                      min_value=1,
-                      max_value=500,
-                      key='_kmeans_max_iter',
-                      value=st.session_state.kmeans_max_iter,
-                      on_change=strml.update_settings,
-                      kwargs={'keys': ['kmeans_max_iter']},
-                      help='The maximum number of iterations for the algorithm \
-                      to run.')
-        elif current_algorithm == 'Agglomerative':
-            st.selectbox('Metric',
-                         options=['euclidean', 'l1', 'l2',
-                                  'manhattan', 'cosine'],
-                         key='_aggl_metric',
-                         index=None,
-                         placeholder=st.session_state.aggl_metric,
-                         on_change=strml.update_settings,
-                         kwargs={'keys': ['aggl_metric']})
-        st.text_input('Keyword arguments',
-                      key='_cluster_kwargs',
-                      value=st.session_state.cluster_kwargs,
-                      on_change=strml.update_settings,
-                      kwargs={'keys': ['cluster_kwargs']},
-                      help="Extra arguments to pass to the scikit-learn \
-                      clustering model. Should be formatted as a Python \
-                      dictionary, e.g., {'kw': 'kw_value'}. Note: the app will \
-                      not check whether these are correct before attempting \
-                      to run the algorithm, so incorrect entries may crash the \
-                      current session.")
-        st.button('Run algorithm', on_click=strml.run_clustering)
+        with st.form(key='_cluster_param_form', border=False):
+            if current_algorithm == 'DBSCAN':
+                st.number_input('Epsilon',
+                          min_value=0.001,
+                          max_value=10.0,
+                          value=st.session_state.dbscan_eps,
+                          key='_dbscan_eps',
+                          help='The maximum distance between two samples for one \
+                          to be considered as in the neighborhood of the other.')
+                st.number_input('Minimum samples',
+                          min_value=1,
+                          max_value=100,
+                          value=st.session_state.dbscan_min_samples,
+                          key='_dbscan_min_samples',
+                          help='The number of samples in a neighborhood for a \
+                          point to be considered as a core point. At higher \
+                          values, the algorithm will find denser clusters, and \
+                          at lower values, the clusters will be more sparser.')
+            elif current_algorithm == 'HDBSCAN':
+                st.number_input('Minimum cluster size',
+                                min_value=2,
+                                max_value=1000,
+                                key='_hdbscan_min_cluster_size',
+                                value=st.session_state.hdbscan_min_cluster_size)
+                st.number_input('Minimum samples',
+                                min_value=1,
+                                max_value=1000,
+                                key='_hdbscan_min_samples',
+                                value=st.session_state.hdbscan_min_samples)
+            elif current_algorithm == 'k-means':
+                st.number_input('Number of clusters',
+                          min_value=1,
+                          max_value=100,
+                          key='_kmeans_n_clusters',
+                          value=st.session_state.kmeans_n_clusters,
+                          help='The number of clusters to form, as well as the \
+                          number of centroids to generate.')
+                st.number_input('Max iterations',
+                          min_value=1,
+                          max_value=500,
+                          key='_kmeans_max_iter',
+                          value=st.session_state.kmeans_max_iter,
+                          help='The maximum number of iterations for the algorithm \
+                          to run.')
+            elif current_algorithm == 'Agglomerative':
+                st.selectbox('Metric',
+                             options=['euclidean', 'l1', 'l2',
+                                      'manhattan', 'cosine'],
+                             key='_aggl_metric',
+                             index=None,
+                             placeholder=st.session_state.aggl_metric,
+                             kwargs={'keys': ['aggl_metric']})
+            st.text_input('Keyword arguments',
+                          key='_cluster_kwargs',
+                          value=st.session_state.cluster_kwargs,
+                          kwargs={'keys': ['cluster_kwargs']},
+                          help="Extra arguments to pass to the scikit-learn \
+                          clustering model. Should be formatted as a Python \
+                          dictionary, e.g., {'kw': kw_value}. Note: the app will \
+                          not check whether these are correct before attempting \
+                          to run the algorithm, so incorrect entries may crash the \
+                          current session.")
+            st.form_submit_button('Run algorithm',
+                                  on_click=strml.run_clustering)
     with st.expander('Visualize', expanded=has_reduction):
         if has_reduction:
             st.selectbox('Choose a reduction',
@@ -527,7 +501,7 @@ with st.sidebar:
                         st.session_state.current_reduction
                     ].label_df.columns.values)
                 if has_metadata:
-                    display_cols += list(st.session_state.metadata.columns.values)
+                    display_cols += list(td.metadata.columns.values)
                 st.selectbox('Color points by',
                              index=None,
                              options=display_cols,
@@ -632,7 +606,7 @@ with st.container(border=True):
             cluster_cols = current_reduc.label_df.columns.values
             display_data[cluster_cols] = current_reduc.label_df.values
         if has_metadata:
-            display_data = pd.concat([display_data, st.session_state.metadata],
+            display_data = pd.concat([display_data, td.metadata],
                                      axis=1)
         if st.session_state.map_in_3d:
             fig = px.scatter_3d(data_frame=display_data,

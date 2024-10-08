@@ -6,6 +6,7 @@ import logging
 import os
 import pandas as pd
 import streamlit as st
+import ast
 
 from tools.data import compute_nn, reduce_dimensions
 from tools.text import TextData
@@ -66,22 +67,36 @@ def load_file():
             st.session_state.source_file = loaded_source
             st.session_state.metadata = loaded_source
         elif data_type == 'Bulk documents':
+            st.session_state.data_type_dict.update({'Metadata': ['csv']})
             pass
         elif data_type == 'Premade embeddings':
             try:
                 embeddings = pd.read_csv(sf)
             except:
                 embeddings = pd.read_csv(sf, encoding='latin')
-            st.session_state.embeddings = embeddings
-            compute_nn()
-            reduce_dimensions(reduction_method='PCA')
+            td = TextData(embeddings=embeddings)
+            td.precomputed_knn = compute_nn(embeddings=embeddings)
+            td.reduce(method='PCA')
+            st.session_state.current_text_data = 'documents'
+            st.session_state.text_data_dict.update({'documents': td})
+            st.session_state.current_reduction = td.last_reduction
+            st.session_state.data_type_dict.update({'Metadata': ['csv']})
         elif data_type == 'Metadata':
             try:
                 metadata = pd.read_csv(sf)
             except:
                 metadata = pd.read_csv(sf, encoding='latin')
-            st.session_state.metadata = metadata
+            td = fetch_td(st.session_state.current_text_data)
+            td.metadata = metadata
+            st.session_state.text_data_dict.update({'documents': td})
     return
+
+
+def fetch_td(td_name):
+    """Wrapper to hide the session state dict call for selecting a TextData
+    object to work with.
+    """
+    return st.session_state.text_data_dict[td_name]
 
 
 def set_text():
@@ -93,8 +108,8 @@ def set_text():
     sf[text_col] = sf[text_col].astype(str)
     docs = [str(d) for d in sf[text_col]]
     text_type = st.session_state.embedding_type
-    td = TextData(docs)
-    st.session_state.current_text_data = td
+    td = TextData(docs=docs, metadata=sf)
+    st.session_state.current_text_data = text_type
     st.session_state.text_data_dict.update({text_type: td})
     st.session_state.hover_columns = [text_col]
     st.session_state.source_file = sf
@@ -104,7 +119,7 @@ def set_text():
 def fetch_embeddings():
     """Generates embeddings for the user's text, along with the associated \
     PCA reduction for initial visualization."""
-    td = st.session_state.current_text_data
+    td = fetch_td(st.session_state.current_text_data)
     if td is not None:
         td.embed(model_name=st.session_state.embedding_model)
         reduce_dimensions()
@@ -115,10 +130,12 @@ def fetch_embeddings():
 
 def reduce_dimensions():
     """Reduces the dimensonality of the currently-chosen embeddings."""
-    td = st.session_state.current_text_data
+    td = fetch_td(st.session_state.current_text_data)
     method = st.session_state.reduction_method
     rd = st.session_state.reduction_dict
     method_low = rd[method]['lower_name']
+    param_names = [method_low + '_' + p for p in rd[method]['params']]
+    update_settings(keys=param_names, toast=False)
     kwargs = {p: st.session_state[method_low + '_' + p]
               for p in rd[method]['params']}
     dimensions = st.session_state.reduction_dimensions
@@ -135,10 +152,13 @@ def run_clustering():
     cd = st.session_state.cluster_dict
     mod_name = cd[algo]['sklearn_name']
     lower_name = cd[algo]['lower_name']
-    main_kwargs = {p: st.session_state[lower_name + '_' + p]
-                   for p in cd[algo]['params']}
-    aux_kwargs = st.session_state.cluster_kwargs
-    td = st.session_state.current_text_data
+    param_names = [lower_name + '_' + p for p in cd[algo]['params']]
+    update_settings(keys=param_names, toast=False)
+    update_settings(keys=['cluster_kwargs'], toast=False)
+    main_kwargs = {p.replace(lower_name + '_', ''):
+        st.session_state[p] for p in param_names}
+    aux_kwargs = ast.literal_eval(st.session_state.cluster_kwargs)
+    td = fetch_td(st.session_state.current_text_data)
     td.cluster(reduction=st.session_state.current_reduction,
                method=algo,
                main_kwargs=main_kwargs,

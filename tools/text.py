@@ -42,7 +42,7 @@ class TextData:
         self.precomputed_knn = data.compute_nn(self.embeddings)
 
     def reduce(self,
-               method='UMAP',
+               method='PCA',
                dimensions=3,
                main_kwargs={},
                aux_kwargs={}):
