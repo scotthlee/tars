@@ -51,7 +51,6 @@ class TextData:
         reducer.fit(self.embeddings,
                     main_kwargs=main_kwargs,
                     aux_kwargs=aux_kwargs)
-        st.write(reducer.name)
         self.reductions.update({reducer.name: reducer})
         self.last_reduction = reducer.name
         return
@@ -59,9 +58,12 @@ class TextData:
     def cluster(self,
                 reduction,
                 method,
-                kwargs={}):
+                main_kwargs={},
+                aux_kwargs={}):
         """Runs a clustering algorithm on one of the object's reductions."""
-        self.reductions[reduction].cluster(method=method, kwargs=kwargs)
+        self.reductions[reduction].cluster(method=method,
+                                           main_kwargs=main_kwargs,
+                                           aux_kwargs=aux_kwargs)
         return
 
 
@@ -77,14 +79,6 @@ def docs_to_sents():
     sents_flat = [s for l in sents for s in l]
     rows = [[i] * len(l) for i, l in enumerate(sents)]
     rows_flat = [r for l in rows for r in l]
-    return
-
-
-def fetch_embeddings():
-    """Generates embeddings for the user's text, along with the associated \
-    PCA reduction for initial visualization."""
-    td = st.session_state.text_data_dict[st.session_state.embedding_type]
-    td.embed(model_name=st.session_state.embedding_model)
     return
 
 

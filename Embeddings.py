@@ -353,7 +353,7 @@ with st.sidebar:
         )
         st.button(label='Generate embeddings',
                   key='_embed_go',
-                  on_click=text.fetch_embeddings)
+                  on_click=strml.fetch_embeddings)
     with st.expander('Reduce', expanded=(not has_reduction) and
                      has_embeddings):
         st.selectbox(label='Method',
@@ -525,7 +525,7 @@ with st.sidebar:
                 if has_clusters:
                     display_cols += list(td.reductions[
                         st.session_state.current_reduction
-                    ]['label_df'].columns.values)
+                    ].label_df.columns.values)
                 if has_metadata:
                     display_cols += list(st.session_state.metadata.columns.values)
                 st.selectbox('Color points by',

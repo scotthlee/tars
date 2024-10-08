@@ -101,6 +101,18 @@ def set_text():
     return
 
 
+def fetch_embeddings():
+    """Generates embeddings for the user's text, along with the associated \
+    PCA reduction for initial visualization."""
+    td = st.session_state.current_text_data
+    if td is not None:
+        td.embed(model_name=st.session_state.embedding_model)
+        reduce_dimensions()
+    else:
+        st.error('Please specify a text column to embed.')
+    return
+
+
 def reduce_dimensions():
     """Reduces the dimensonality of the currently-chosen embeddings."""
     td = st.session_state.current_text_data
@@ -123,8 +135,8 @@ def run_clustering():
     cd = st.session_state.cluster_dict
     mod_name = cd[algo]['sklearn_name']
     lower_name = cd[algo]['lower_name']
-    kwargs = {p: st.session_state[lower_name + '_' + p]
-              for p in cd[algo]['params']}
+    main_kwargs = {p: st.session_state[lower_name + '_' + p]
+                   for p in cd[algo]['params']}
     aux_kwargs = st.session_state.cluster_kwargs
     td = st.session_state.current_text_data
     td.cluster(reduction=st.session_state.current_reduction,

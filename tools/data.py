@@ -38,13 +38,14 @@ class ClusterModel:
             }
         }
 
-    def fit(self, X, kwargs={}):
+    def fit(self, X,
+            main_kwargs={},
+            aux_kwargs={}):
         """Fits the chosen clustering model to the data."""
-        self.model.fit(X, **kwargs)
-        self.params = kwargs
         algo = self.model_name
         mod_name = self.model_choices[algo]['sklearn_name']
         lower_name = self.model_choices[algo]['lower_name']
+        kwargs = {**main_kwargs, **aux_kwargs}
         mod = globals()[algo](**kwargs)
         with st.spinner('Running the clustering algorithm...'):
             mod.fit(X)
@@ -53,8 +54,9 @@ class ClusterModel:
         elif algo == 'KMeans':
             self.centers = mod.cluster_centers_
         labels = np.array(mod.labels_).astype(str)
-        self.labels = pd.DataFrame(labels, columsn=[lower_name + '_id'])
+        self.labels = pd.DataFrame(labels, columns=[lower_name + '_id'])
         self.model = mod
+        self.params = kwargs
         return
 
 
@@ -94,10 +96,10 @@ class EmbeddingReduction:
     def cluster(self, method='HDBSCAN', main_kwargs={}, aux_kwargs={}):
         """Adds a ClusterModel to the current reduction."""
         mod = ClusterModel(model_name=method)
-        mod.fit(self.points,
+        mod.fit(X=self.points,
                 main_kwargs=main_kwargs,
                 aux_kwargs=aux_kwargs)
-        self.cluster_models.update({mod.name: mod})
+        self.cluster_models.update({mod.model_name: mod})
         if self.label_df is None:
             self.label_df = mod.labels
         else:
