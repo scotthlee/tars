@@ -557,6 +557,8 @@ with st.sidebar:
                   help='How tall you want the scatterplot to be. It will fill \
                   the width of the screen by default, but the height is \
                   adjustable.')
+    st.button('Name clusters',
+              on_click=strml.name_clusters)
     with st.expander('Download', expanded=False):
         if has_embeddings:
             st.download_button(label='Embeddings',

@@ -1,5 +1,6 @@
 """Functions for working specifically with objects in the Streamlit session
-state.
+state Generally, these are high level functions that operate on aspects of the
+session state itself or on a TextData object.
 """
 import re
 import logging
@@ -8,7 +9,7 @@ import pandas as pd
 import streamlit as st
 import ast
 
-from tools.data import compute_nn, reduce_dimensions
+from tools.data import compute_nn
 from tools.text import TextData
 
 
@@ -174,3 +175,13 @@ def switch_reduction():
     update_settings(['current_reduction'])
     st.session_state.color_column = None
     return
+
+
+def name_clusters():
+    td = fetch_td(st.session_state.current_text_data)
+    reduction = st.session_state.current_reduction
+    model = 'DBSCAN'
+    td.name_clusters(reduction=st.session_state.current_reduction,
+                     method='TF-IDF',
+                     model='DBSCAN')
+    st.write(td)

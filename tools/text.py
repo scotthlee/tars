@@ -46,6 +46,11 @@ class TextData:
                dimensions=3,
                main_kwargs={},
                aux_kwargs={}):
+        """Reduces the dimensionality of the text embeddings using one of
+        three methods: PCA, t-SNE, or UMAP. The reduced-dimensionality
+        embeddings are stored as a data.EmbeddingReduction() object stored in
+        the TextData object's reductions dict attribute.
+        """
         reducer = data.EmbeddingReduction(method=method,
                                           dimensions=dimensions)
         reducer.fit(self.embeddings,
@@ -64,6 +69,27 @@ class TextData:
         self.reductions[reduction].cluster(method=method,
                                            main_kwargs=main_kwargs,
                                            aux_kwargs=aux_kwargs)
+        return
+
+    def name_clusters(self,
+                      reduction,
+                      model,
+                      method,
+                      top_k=10,
+                      norm='l1',
+                      main_kwargs={},
+                      aux_kwargs={}):
+        """Names clusters based on the text samples they contain. Uses one of
+        two approaches: cluster TF-IDF (the last step of BERTopic), or direct
+        labeling with ChatGPT.
+        """
+        self.reductions[reduction].name_clusters(model=model,
+                                                method=method,
+                                                top_k=top_k,
+                                                norm=norm,
+                                                docs=self.text,
+                                                main_kwargs=main_kwargs,
+                                                aux_kwargs=aux_kwargs)
         return
 
 

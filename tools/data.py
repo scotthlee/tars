@@ -3,9 +3,11 @@ import pandas as pd
 import io
 import streamlit as st
 
+from copy import deepcopy
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from sklearn.cluster import KMeans, DBSCAN, HDBSCAN, AgglomerativeClustering
+from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
 from sklearn.preprocessing import normalize, scale
 from umap import UMAP
 from umap.umap_ import nearest_neighbors
@@ -19,6 +21,7 @@ class ClusterModel:
         self.centers = None
         self.model = None
         self.labels = None
+        self.topics = None
         self.model_name = model_name
         self.model_choices = {
             'DBSCAN': {
@@ -60,6 +63,47 @@ class ClusterModel:
         self.params = kwargs
         return
 
+    def name_clusters(self,
+                      docs,
+                      method='TF-IDF',
+                      norm='l1',
+                      top_k=10,
+                      main_kwargs={},
+                      aux_kwargs={}):
+        """Names clusters based on the text samples they contain. Uses one of
+        two approaches: cluster TF-IDF (the last step of BERTopic), or direct
+        labeling with ChatGPT."""
+        # Merge docs with cluster IDs
+        lower_name = self.model_choices[self.model_name]['lower_name']
+        id_name = lower_name + '_id'
+        cluster_df = deepcopy(self.labels)
+        cluster_df['docs'] = docs
+
+        if method == 'TF-IDF':
+            # Merge the docs in each cluster
+            cluster_ids = cluster_df[id_name].unique()
+            clustered_docs = []
+            for id in cluster_ids:
+                doc_blob = ' '.join(cluster_df.docs[cluster_df[id_name] == id])
+                clustered_docs.append(doc_blob)
+
+            # Vectorize the clustered documents and fetch the vocabulary
+            veccer = CountVectorizer(stop_words='english')
+            count_vecs = veccer.fit_transform(clustered_docs)
+            vocab = veccer.vocabulary_
+            reverse_vocab = {vocab[k]: k for k in list(vocab.keys())}
+
+            # Conver the count vectors to TF-IDF vectors
+            tiffer = TfidfTransformer(norm=norm)
+            tfidf_vecs = tiffer.fit_transform(count_vecs)
+
+            # Get the top terms for each set of clustered docs based on TF-IDF
+            sorted = np.flip(np.argsort(tfidf_vecs, axis=1), axis=1)
+            sorted_terms = np.array([[reverse_vocab[k] for k in r]
+                                     for r in sorted])
+            top_terms = sorted_terms[:, :top_k]
+            self.topics = top_terms
+
 
 class EmbeddingReduction:
     """A container class for a dimensionally-reduced set of embeddings."""
@@ -69,30 +113,7 @@ class EmbeddingReduction:
         self.points = None
         self.label_df = None
         self.cluster_models = {}
-
-    def name_reduction(self, param_vals):
-        """Generates a string name for a particular reduction."""
-        param_dict = {
-            'UMAP': {
-                'name': 'umap',
-                'params': ['n_neighbors', 'min_dist'],
-                'param_abbrevs': ['nn', 'dist']
-            },
-            't-SNE': {
-                'name': 'tsne',
-                'params': ['perplexity', 'learning_rate', 'n_iter'],
-                'param_abbrevs': ['perp', 'lr', 'iter']
-            }
-        }
-        if self.method != 'PCA':
-            curr_name = param_dict[self.method]['name']
-            param_abbrevs = param_dict[self.method]['param_abbrevs']
-            param_str = ', '.join([param_abbrevs[i] + '=' + str(param_vals[i])
-                                   for i in range(len(param_vals))])
-            name_str = self.method + '(' + param_str + ')'
-        else:
-            name_str = 'PCA'
-        self.name = name_str
+        self.cluster_names = {}
 
     def cluster(self, method='HDBSCAN', main_kwargs={}, aux_kwargs={}):
         """Adds a ClusterModel to the current reduction."""
@@ -131,23 +152,51 @@ class EmbeddingReduction:
         self.name_reduction(list(main_kwargs.values()))
         return
 
+    def name_reduction(self, param_vals):
+        """Generates a string name for a particular reduction."""
+        param_dict = {
+            'UMAP': {
+                'name': 'umap',
+                'params': ['n_neighbors', 'min_dist'],
+                'param_abbrevs': ['nn', 'dist']
+            },
+            't-SNE': {
+                'name': 'tsne',
+                'params': ['perplexity', 'learning_rate', 'n_iter'],
+                'param_abbrevs': ['perp', 'lr', 'iter']
+            }
+        }
+        if self.method != 'PCA':
+            curr_name = param_dict[self.method]['name']
+            param_abbrevs = param_dict[self.method]['param_abbrevs']
+            param_str = ', '.join([param_abbrevs[i] + '=' + str(param_vals[i])
+                                   for i in range(len(param_vals))])
+            name_str = self.method + '(' + param_str + ')'
+        else:
+            name_str = 'PCA'
+        self.name = name_str
 
-@st.dialog('Dendrogram')
-def show_dendrogram():
-    current_reduc = st.session_state.current_reduction
-    if 'aggl' not in st.session_state.reduction_dict[current_reduc]['cluster_mods']:
-        st.write('Please run the agglomerative clustering algorithm to see \
-                 a dendrogram.')
-    else:
-        mod = st.session_state.reduction_dict[current_reduc]['cluster_mods']['aggl']
-        fig = make_dendrogram(mod)
-        st.pyplot(fig=fig, clear_figure=True)
-    st.write('Hello!')
+    def name_clusters(self,
+                      model,
+                      docs,
+                      method='TF-IDF',
+                      top_k=10,
+                      norm='l1',
+                      main_kwargs={},
+                      aux_kwargs={}):
+        """Names clusters based on the text samples they contain. Uses one of
+        two approaches: cluster TF-IDF (the last step of BERTopic), or direct
+        labeling with ChatGPT."""
+        self.cluster_models[model].name_clusters(method=method,
+                                                 top_k=top_k,
+                                                 norm=norm,
+                                                 docs=docs,
+                                                 main_kwargs=main_kwargs,
+                                                 aux_kwargs=aux_kwargs)
 
 
 def make_dendrogram(model, as_bytes=True):
-    # Create linkage matrix and then plot the dendrogram
-    # create the counts of samples under each node
+    """Makes a dendrogram for an agglomerative clustering model."""
     counts = np.zeros(model.children_.shape[0])
     n_samples = len(model.labels_)
     for i, merge in enumerate(model.children_):
@@ -162,8 +211,6 @@ def make_dendrogram(model, as_bytes=True):
     linkage_matrix = np.column_stack(
         [model.children_, model.distances_, counts]
     ).astype(float)
-
-    # Assemble the dendrogram
 
     # Make the plot
     fig = plt.figure()
@@ -183,68 +230,3 @@ def compute_nn(embeddings,
                                angular=False,
                                random_state=None)
     return nn
-
-
-def reduce_dimensions(reduction_method=None):
-    """Performs dimensionality reduction on the current state's embeddings. \
-    Algorithm options are PCA, UMAP, and t-SNE."""
-    if reduction_method is None:
-        reduction_method = st.session_state.reduction_method
-    else:
-        st.session_state.reduction_method = reduction_method
-    dims = 3 if st.session_state.map_in_3d else 2
-    if reduction_method == 'PCA':
-        reducer = PCA(n_components=dims)
-    elif reduction_method == 'UMAP':
-        reducer = UMAP(n_components=dims,
-                       precomputed_knn=st.session_state.precomputed_nn,
-                       n_neighbors=st.session_state.umap_n_neighbors,
-                       min_dist=st.session_state.umap_min_dist)
-    elif reduction_method == 't-SNE':
-        reducer = TSNE(n_components=dims,
-                       perplexity=st.session_state.tsne_perplexity,
-                       n_iter=st.session_state.tsne_n_iter)
-    with st.spinner('Running ' + reduction_method + '...'):
-        reduction = reducer.fit_transform(st.session_state.embeddings)
-    colnames = ['d' + str(i + 1) for i in range(dims)]
-    reduction = pd.DataFrame(reduction, columns=colnames)
-    reduction_name = name_reduction()
-    st.session_state.reduction_dict.update({
-        reduction_name: {
-            'points': reduction,
-            'cluster_ids': None,
-            'cluster_mods': {}
-        }
-    })
-    st.session_state.current_reduction = reduction_name
-    return
-
-
-def name_reduction():
-    """Generates a string name for a particular reduction."""
-    param_dict = {
-        'UMAP': {
-            'name': 'umap',
-            'params': ['n_neighbors', 'min_dist'],
-            'param_abbrevs': ['nn', 'dist']
-        },
-        't-SNE': {
-            'name': 'tsne',
-            'params': ['perplexity', 'learning_rate', 'n_iter'],
-            'param_abbrevs': ['perp', 'lr', 'iter']
-        }
-    }
-    curr_method = st.session_state.reduction_method
-    if curr_method != 'PCA':
-        curr_name = param_dict[curr_method]['name']
-        param_vals = [
-            str(st.session_state[curr_name + '_' + p])
-            for p in param_dict[curr_method]['params']
-        ]
-        param_abbrevs = param_dict[curr_method]['param_abbrevs']
-        param_str = ', '.join([param_abbrevs[i] + '=' + param_vals[i]
-                               for i in range(len(param_vals))])
-        name_str = curr_method + '(' + param_str + ')'
-    else:
-        name_str = 'PCA'
-    return name_str
