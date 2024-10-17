@@ -74,7 +74,7 @@ class TextData:
     def name_clusters(self,
                       reduction,
                       model,
-                      method,
+                      method='TF-IDF',
                       top_k=10,
                       norm='l1',
                       main_kwargs={},
@@ -84,14 +84,13 @@ class TextData:
         labeling with ChatGPT.
         """
         self.reductions[reduction].name_clusters(model=model,
-                                                method=method,
-                                                top_k=top_k,
-                                                norm=norm,
-                                                docs=self.text,
-                                                main_kwargs=main_kwargs,
-                                                aux_kwargs=aux_kwargs)
+                                                 method=method,
+                                                 top_k=top_k,
+                                                 norm=norm,
+                                                 docs=self.text,
+                                                 main_kwargs=main_kwargs,
+                                                 aux_kwargs=aux_kwargs)
         return
-
 
 
 def docs_to_sents():

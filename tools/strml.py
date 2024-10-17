@@ -183,5 +183,5 @@ def name_clusters():
     model = 'DBSCAN'
     td.name_clusters(reduction=st.session_state.current_reduction,
                      method='TF-IDF',
-                     model='DBSCAN')
+                     model=model)
     st.write(td)

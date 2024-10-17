@@ -78,10 +78,13 @@ class ClusterModel:
         id_name = lower_name + '_id'
         cluster_df = deepcopy(self.labels)
         cluster_df['docs'] = docs
+        cluster_df.docs = cluster_df.docs.astype(str)
 
         if method == 'TF-IDF':
             # Merge the docs in each cluster
             cluster_ids = cluster_df[id_name].unique()
+            st.write(id_name)
+            st.write(cluster_ids)
             clustered_docs = []
             for id in cluster_ids:
                 doc_blob = ' '.join(cluster_df.docs[cluster_df[id_name] == id])
