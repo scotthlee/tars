@@ -157,10 +157,8 @@ reduction_dict = {
 }
 if 'reduction_dict' not in st.session_state:
     st.session_state.reduction_dict = reduction_dict
-if 'map_in_3d' not in st.session_state:
-    st.session_state.map_in_3d = True
-if 'reduction_dimensions' not in st.session_state:
-    st.session_state.reduction_dimensions = 3
+if 'reduce_to_3d' not in st.session_state:
+    st.session_state.reduce_to_3d = True
 if 'reduction' not in st.session_state:
     st.session_state.reduction = None
 if 'reduction_method' not in st.session_state:
@@ -255,6 +253,8 @@ if 'cluster_kwargs' not in st.session_state:
     st.session_state.cluster_kwargs = {}
 
 # And finally the plotting options
+if 'map_in_3d' not in st.session_state:
+    st.session_state.map_in_3d = True
 if 'label_columns' not in st.session_state:
     st.session_state.label_columns = None
 if 'color_column' not in st.session_state:
@@ -286,9 +286,11 @@ for key in to_load:
 
 # Specifying the current text data object for shorthand
 td_name = st.session_state.current_text_data
+has_data = td_name is not None
+has_source = st.session_state.source_file is not None
 
 # Some bools for controlling menu expansions
-if td_name is not None:
+if has_data:
     td = st.session_state.text_data_dict[td_name]
     has_embeddings = td.embeddings is not None
     has_reduction = bool(td.reductions)
@@ -320,6 +322,8 @@ with st.sidebar:
                          type=st.session_state.data_type_dict[st.session_state.data_type],
                          key='_source_file',
                          on_change=strml.load_file)
+        if has_metadata:
+            st.selectbox('')
     with st.expander('Embed', expanded=not has_embeddings):
         if st.session_state.source_file is not None:
             st.selectbox('Text Column',
@@ -400,8 +404,8 @@ with st.sidebar:
                           value=st.session_state.tsne_n_iter,
                           key='_tsne_n_iter')
             st.toggle(label='3D',
-                      key='_map_in_3d',
-                      value=st.session_state.map_in_3d,
+                      key='_reduce_to_3d',
+                      value=st.session_state.reduce_to_3d,
                       help='Whether to reduce the embeddings to 3 dimensions \
                       (instead of 2).')
             st.form_submit_button('Start Reduction',
@@ -481,7 +485,7 @@ with st.sidebar:
                           current session.")
             st.form_submit_button('Run algorithm',
                                   on_click=strml.run_clustering)
-    with st.expander('Visualize', expanded=has_reduction):
+    with st.expander('Plot', expanded=has_reduction):
         if has_reduction:
             st.selectbox('Choose a reduction',
                          index=None,
@@ -527,6 +531,13 @@ with st.sidebar:
                           on_change=strml.update_settings,
                           kwargs={'keys': ['show_legend']},
                           help='Turns the plot legend on and off.')
+        st.toggle(label='3D',
+                  key='_map_in_3d',
+                  value=st.session_state.map_in_3d,
+                  on_change=strml.update_settings,
+                  kwargs={'keys': ['map_in_3d']},
+                  help='Whether to plot the embeddings in 3 dimensions \
+                  (instead of 2).')
         st.slider('Marker size',
                   min_value=1,
                   max_value=20,
@@ -557,8 +568,6 @@ with st.sidebar:
                   help='How tall you want the scatterplot to be. It will fill \
                   the width of the screen by default, but the height is \
                   adjustable.')
-    st.button('Name clusters',
-              on_click=strml.name_clusters)
     with st.expander('Download', expanded=False):
         if has_embeddings:
             st.download_button(label='Embeddings',
@@ -575,8 +584,9 @@ with st.sidebar:
                                file_name=cr + '.csv',
                                mime='text/csv',
                                key='_reduc_save',
-                               help='Downloads the current reduction and its \
-                               cluster IDs.')
+                               help='Downloads the current set of \
+                               reduced-dimension embeddings, along with any \
+                               cluster IDs that were generated for them.')
             if has_aggl:
                 mod = td.reductions[cr]['cluster_models']['aggl']
                 fig = data.make_dendrogram(mod)
@@ -589,7 +599,6 @@ with st.sidebar:
                                    help='Downloads the clustering dendrogram.')
 
 # Making the main visualization
-#st.write(st.session_state.text_data_dict['document'].reductions)
 with st.container(border=True):
     if has_reduction:
         # Construct the hover columns

@@ -83,8 +83,6 @@ class ClusterModel:
         if method == 'TF-IDF':
             # Merge the docs in each cluster
             cluster_ids = cluster_df[id_name].unique()
-            st.write(id_name)
-            st.write(cluster_ids)
             clustered_docs = []
             for id in cluster_ids:
                 doc_blob = ' '.join(cluster_df.docs[cluster_df[id_name] == id])
@@ -98,15 +96,20 @@ class ClusterModel:
 
             # Conver the count vectors to TF-IDF vectors
             tiffer = TfidfTransformer(norm=norm)
-            tfidf_vecs = tiffer.fit_transform(count_vecs)
+            tfidf_vecs = tiffer.fit_transform(count_vecs).toarray()
 
             # Get the top terms for each set of clustered docs based on TF-IDF
             sorted = np.flip(np.argsort(tfidf_vecs, axis=1), axis=1)
-            sorted_terms = np.array([[reverse_vocab[k] for k in r]
-                                     for r in sorted])
-            top_terms = sorted_terms[:, :top_k]
-            self.topics = top_terms
+            sorted_terms = []
+            for r in sorted:
+                row_terms = []
+                for k in r[:top_k]:
+                    row_terms.append(reverse_vocab.get(k, k))
+                sorted_terms.append(row_terms)
+            sorted_terms = np.array(sorted_terms)
+            self.topics = sorted_terms
 
+        return
 
 class EmbeddingReduction:
     """A container class for a dimensionally-reduced set of embeddings."""

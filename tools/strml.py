@@ -77,7 +77,7 @@ def load_file():
                 embeddings = pd.read_csv(sf, encoding='latin')
             td = TextData(embeddings=embeddings)
             td.precomputed_knn = compute_nn(embeddings=embeddings)
-            td.reduce(method='PCA')
+            td.reduce(method='UMAP')
             st.session_state.current_text_data = 'documents'
             st.session_state.text_data_dict.update({'documents': td})
             st.session_state.current_reduction = td.last_reduction
@@ -184,4 +184,4 @@ def name_clusters():
     td.name_clusters(reduction=st.session_state.current_reduction,
                      method='TF-IDF',
                      model=model)
-    st.write(td)
+    return
