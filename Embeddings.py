@@ -229,8 +229,8 @@ cluster_dict = {
             'compute_distances', 'distance_threshold'
         ],
         'param_abbrevs': [
-        'metric', 'link', 'comp_dist',
-        'dist_thr'
+            'metric', 'link', 'comp_dist',
+            'dist_thr'
         ]
     }
 }

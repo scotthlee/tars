@@ -1,6 +1,5 @@
 """Functions for working specifically with objects in the Streamlit session
-state Generally, these are high level functions that operate on aspects of the
-session state itself or on a TextData object.
+state.
 """
 import re
 import logging

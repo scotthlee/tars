@@ -104,7 +104,7 @@ def docs_to_sents():
     sents_flat = [s for l in sents for s in l]
     rows = [[i] * len(l) for i, l in enumerate(sents)]
     rows_flat = [r for l in rows for r in l]
-    return
+    return sents_flat, rows_flat
 
 
 def average_embeddings(embeddings, weights=None, axis=0):
