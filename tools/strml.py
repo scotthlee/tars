@@ -8,6 +8,7 @@ import os
 import pandas as pd
 import streamlit as st
 import ast
+import pymupdf
 
 from tools.data import compute_nn
 from tools.text import TextData
@@ -69,7 +70,19 @@ def load_file():
             st.session_state.metadata = loaded_source
         elif data_type == 'Bulk documents':
             st.session_state.data_type_dict.update({'Metadata': ['csv']})
-            pass
+            docs = []
+            for f in sf:
+                if f.name[-3:] == 'pdf':
+                    with pymupdf.open(f) as source_doc:
+                        text_blobs = [d.get_text() for d in source_doc]
+                        doc = ' '.join(text_blobs)
+                else:
+                    doc = f.read().decode('utf-8')
+                docs.append(doc)
+            td = TextData(docs=docs)
+            st.session_state.source_file = docs[0]
+            st.session_state.current_text_data = 'documents'
+            st.session_state.text_data_dict.update({'documents': td})
         elif data_type == 'Premade embeddings':
             try:
                 embeddings = pd.read_csv(sf)
@@ -139,7 +152,7 @@ def reduce_dimensions():
     update_settings(keys=param_names, toast=False)
     kwargs = {p: st.session_state[method_low + '_' + p]
               for p in rd[method]['params']}
-    dimensions = st.session_state.reduction_dimensions
+    dimensions = int(st.session_state.reduce_to_3d) + 2
     td.reduce(method=method, dimensions=dimensions, main_kwargs=kwargs)
     st.session_state.current_reduction = td.last_reduction
     return
@@ -178,6 +191,9 @@ def switch_reduction():
 
 
 def name_clusters():
+    """Generates cluster names as topic lists. Currently only one method,
+    cluster-based TF-IDF, from BERTopic, is supported.
+    """
     td = fetch_td(st.session_state.current_text_data)
     reduction = st.session_state.current_reduction
     model = 'DBSCAN'

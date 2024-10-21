@@ -235,7 +235,8 @@ cluster_dict = {
     }
 }
 
-# Assigning initial session state values for the clustering models
+# Assigning initial session state values for the clustering models; the
+# 'dbscan_eps' reference is arbitrary, as session state key would work.
 if 'dbscan_eps' not in st.session_state:
     for method in list(cluster_defaults.keys()):
         ln = cluster_dict[method]['lower_name']
@@ -288,8 +289,9 @@ for key in to_load:
 td_name = st.session_state.current_text_data
 has_data = td_name is not None
 has_source = st.session_state.source_file is not None
+tabular_source = st.session_state.data_type == 'Tabular data with text column'
 
-# Some bools for controlling menu expansions
+# Some bools for controlling menu expansion and container rendering
 if has_data:
     td = st.session_state.text_data_dict[td_name]
     has_embeddings = td.embeddings is not None
@@ -309,7 +311,7 @@ else:
     has_aggl = False
 
 with st.sidebar:
-    with st.expander('Load', expanded=not has_embeddings):
+    with st.expander('Load', expanded=not (has_source or has_data)):
         st.radio('What kind of data do you want to load?',
                  options=list(st.session_state.data_type_dict.keys()),
                  key='_data_type',
@@ -321,40 +323,42 @@ with st.sidebar:
         st.file_uploader(label='Select the file(s)',
                          type=st.session_state.data_type_dict[st.session_state.data_type],
                          key='_source_file',
+                         accept_multiple_files=st.session_state.data_type == 'Bulk documents',
                          on_change=strml.load_file)
         if has_metadata:
-            st.selectbox('')
-    with st.expander('Embed', expanded=not has_embeddings):
-        if st.session_state.source_file is not None:
-            st.selectbox('Text Column',
-                         key='_text_column',
-                         index=st.session_state.text_column,
-                         options=st.session_state.source_file.columns.values,
-                         on_change=strml.set_text,
-                         help="Choose the column in your dataset holding the \
-                         text you'd like to embed.")
-        st.selectbox(
-            label='Type',
-            key='_embedding_type',
-            on_change=strml.update_settings,
-            kwargs={'keys': ['embedding_type']},
-            options=['document', 'sentence'],
-            help="Whether you'd like to make embeddings for each 'document' \
-            in your dataset (documents being text contained by a single \
-            spreadhseet cell) or for the sentences in all the documents."
-        )
-        st.selectbox(
-            label='Model',
-            key='_embedding_model',
-            on_change=strml.update_settings,
-            kwargs={'keys': ['embedding_model']},
-            options=['ada-002'],
-            help='The model that will generate the embeddings. For more info \
-            about the different models, see the README.'
-        )
-        st.button(label='Generate embeddings',
-                  key='_embed_go',
-                  on_click=strml.fetch_embeddings)
+            pass
+    with st.expander('Embed', expanded=(not has_embeddings) and
+                     (has_data or has_source)):
+            if tabular_source and has_source:
+                st.selectbox('Text Column',
+                             key='_text_column',
+                             index=st.session_state.text_column,
+                             options=st.session_state.source_file.columns.values,
+                             on_change=strml.set_text,
+                             help="Choose the column in your dataset holding the \
+                             text you'd like to embed.")
+            st.selectbox(
+                label='Type',
+                key='_embedding_type',
+                on_change=strml.update_settings,
+                kwargs={'keys': ['embedding_type']},
+                options=['document', 'sentence'],
+                help="Whether you'd like to make embeddings for each 'document' \
+                in your dataset (documents being text contained by a single \
+                spreadhseet cell) or for the sentences in all the documents."
+            )
+            st.selectbox(
+                label='Model',
+                key='_embedding_model',
+                on_change=strml.update_settings,
+                kwargs={'keys': ['embedding_model']},
+                options=['ada-002'],
+                help='The model that will generate the embeddings. For more info \
+                about the different models, see the README.'
+            )
+            st.button(label='Generate embeddings',
+                      key='_embed_go',
+                      on_click=strml.fetch_embeddings)
     with st.expander('Reduce', expanded=(not has_reduction) and
                      has_embeddings):
         st.selectbox(label='Method',
