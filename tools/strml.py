@@ -126,6 +126,7 @@ def set_text():
     st.session_state.text_data_dict.update({text_type: td})
     st.session_state.hover_columns = [text_col]
     st.session_state.source_file = sf
+    st.session_state.enable_generate_button = True
     return
 
 

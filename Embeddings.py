@@ -106,6 +106,8 @@ if 'embedding_type' not in st.session_state:
     st.session_state.embedding_type = 'document'
 if 'embeddings' not in st.session_state:
     st.session_state.embeddings = None
+if 'enable_generate_button' not in st.session_state:
+    st.session_state.enable_generate_button = False
 
 if 'api_type' not in st.session_state:
     st.session_state.api_type = 'azure_ad'
@@ -262,6 +264,8 @@ if 'color_column' not in st.session_state:
     st.session_state.color_column = None
 if 'hover_columns' not in st.session_state:
     st.session_state.hover_columns = None
+if 'font_size' not in st.session_state:
+    st.session_state.font_size = 16
 if 'plot_width' not in st.session_state:
     st.session_state.plot_width = 800
 if 'plot_height' not in st.session_state:
@@ -358,6 +362,7 @@ with st.sidebar:
             )
             st.button(label='Generate embeddings',
                       key='_embed_go',
+                      disabled=(not st.session_state.enable_generate_button),
                       on_click=strml.fetch_embeddings)
     with st.expander('Reduce', expanded=(not has_reduction) and
                      has_embeddings):
@@ -591,6 +596,8 @@ with st.sidebar:
                                help='Downloads the current set of \
                                reduced-dimension embeddings, along with any \
                                cluster IDs that were generated for them.')
+            if has_clusters:
+                pass
             if has_aggl:
                 mod = td.reductions[cr]['cluster_models']['aggl']
                 fig = data.make_dendrogram(mod)
@@ -640,5 +647,6 @@ with st.container(border=True):
                              opacity=st.session_state.marker_opacity,
                              height=st.session_state.plot_height)
         fig.update_traces(marker=dict(size=st.session_state.marker_size))
-        fig.update_layout(showlegend=st.session_state.show_legend)
+        fig.update_layout(showlegend=st.session_state.show_legend,
+                          hoverlabel=dict(font_size=st.session_state.font_size))
         st.plotly_chart(fig, use_container_width=True)
