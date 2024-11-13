@@ -20,7 +20,8 @@ from tools import oai, data, text, strml
 # Fire up the page
 st.set_page_config(page_title='NLP Tool',
                 layout='wide',
-                page_icon='📖')
+                page_icon='📖',
+                menu_items={'Report a Bug': 'https://github.com/scotthlee/nlp-tool/issues/new/choose'})
 
 # Fetch an API key
 def load_oai_api_key():
@@ -255,6 +256,14 @@ if 'clustering_algorithm' not in st.session_state:
 if 'cluster_kwargs' not in st.session_state:
     st.session_state.cluster_kwargs = {}
 
+# Setting up the labeling options
+if 'label_how' not in st.session_state:
+    st.session_state.label_how = 'By keywords'
+if 'keyword_type' not in st.session_state:
+    st.session_state.keyword_type = 'TF-IDF'
+if 'label_n_neighbors' not in st.session_state:
+    st.session_state.label_n_neighbors = 10
+
 # And finally the plotting options
 if 'map_in_3d' not in st.session_state:
     st.session_state.map_in_3d = True
@@ -307,12 +316,32 @@ if has_data:
         has_aggl = 'aggl' in list(td.reductions[cr].cluster_models.keys())
     else:
         has_reduction = False
+        has_clusters = False
+        has_aggl = False
 else:
     has_embeddings = False
     has_reduction = False
     has_metadata = False
     has_clusters = False
     has_aggl = False
+
+
+@st.dialog('Load your Data')
+def load_dialog():
+    st.radio('What kind of data do you want to load?',
+             options=list(st.session_state.data_type_dict.keys()),
+             key='_data_type',
+             on_change=strml.update_settings,
+             kwargs={'keys': ['data_type']},
+             help="The kind of data you want to load. If you don't have \
+             embeddings made yet, choose tabular data or bulk documents, \
+             depending on how your text is saved, to get started.")
+    st.file_uploader(label='Select the file(s)',
+                     type=st.session_state.data_type_dict[st.session_state.data_type],
+                     key='_source_file',
+                     accept_multiple_files=st.session_state.data_type == 'Bulk documents',
+                     on_change=strml.load_file)
+
 
 with st.sidebar:
     with st.expander('Load', expanded=not (has_source or has_data)):
@@ -494,6 +523,30 @@ with st.sidebar:
                           current session.")
             st.form_submit_button('Run algorithm',
                                   on_click=strml.run_clustering)
+    with st.expander('Label', expanded=has_clusters):
+        st.selectbox('Method',
+                     options=['By keywords', 'With a summary'],
+                     key='_label_how',
+                     placeholder=st.session_state.label_how,
+                     on_change=strml.update_settings,
+                     kwargs={'keys': ['label_how']},
+                     help="How you'd like to label the documents in each \
+                     cluster. 'By keywords' will generate a list of keywords \
+                     for each cluster, and 'With a summary' will ask ChatGPT \
+                     to produce a summary of each one.")
+        if st.session_state.label_how == 'By keywords':
+            st.selectbox('Keyword type',
+                         options=['TF-IDF', 'LLM'],
+                         key='_keyword_type',
+                         placeholder=st.session_state.keyword_type,
+                         help="How you'd like to generate a list of keywords \
+                         for each cluster. 'TF-IDF' does this by looking at how \
+                         often words occur in each cluster versus the others, \
+                         and 'LLM' will do this by sending a random sample of \
+                         documents from each cluster to ChatGPT and asking it \
+                         to generate a list of keywords from each one.")
+            st.button('Generate labels',
+                      on_click=strml.name_clusters)
     with st.expander('Plot', expanded=has_reduction):
         if has_reduction:
             st.selectbox('Choose a reduction',

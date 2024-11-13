@@ -50,7 +50,7 @@ class ClusterModel:
         mod_name = self.model_choices[algo]['sklearn_name']
         lower_name = self.model_choices[algo]['lower_name']
         kwargs = {**main_kwargs, **aux_kwargs}
-        mod = globals()[algo](**kwargs)
+        mod = globals()[mod_name](**kwargs)
         with st.spinner('Running the clustering algorithm...'):
             mod.fit(X)
         if algo == 'DBSCAN':

@@ -196,7 +196,7 @@ def name_clusters():
     """
     td = fetch_td(st.session_state.current_text_data)
     reduction = st.session_state.current_reduction
-    model = 'DBSCAN'
+    model = st.session_state.clustering_algorithm
     td.name_clusters(reduction=st.session_state.current_reduction,
                      method='TF-IDF',
                      model=model)
