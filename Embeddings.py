@@ -21,7 +21,8 @@ from tools import oai, data, text, strml
 st.set_page_config(page_title='NLP Tool',
                 layout='wide',
                 page_icon='📖',
-                menu_items={'Report a Bug': 'https://github.com/scotthlee/nlp-tool/issues/new/choose'})
+                menu_items={'Report a Bug': 'https://github.com/scotthlee/nlp-tool/issues/new/choose',
+                            'About': 'https://github.com/scotthlee/nlp-tool/'})
 
 # Fetch an API key
 def load_oai_api_key():
@@ -128,6 +129,8 @@ if 'frequency_penalty' not in st.session_state:
     st.session_state.frequency_penalty = openai_defaults['chat']['frequency_penalty']
 
 # Setting up the I?O objects
+if 'premade_loaded' not in st.session_state:
+    st.session_state.premade_loaded = False
 if 'text_data_dict' not in st.session_state:
     st.session_state.text_data_dict = {}
 if 'current_text_data' not in st.session_state:
@@ -239,7 +242,7 @@ cluster_dict = {
 }
 
 # Assigning initial session state values for the clustering models; the
-# 'dbscan_eps' reference is arbitrary, as session state key would work.
+# 'dbscan_eps' reference is arbitrary, as any session state key would work.
 if 'dbscan_eps' not in st.session_state:
     for method in list(cluster_defaults.keys()):
         ln = cluster_dict[method]['lower_name']
@@ -263,6 +266,13 @@ if 'keyword_type' not in st.session_state:
     st.session_state.keyword_type = 'TF-IDF'
 if 'label_n_neighbors' not in st.session_state:
     st.session_state.label_n_neighbors = 10
+if 'label_text_column' not in st.session_state:
+    st.session_state.label_text_column = None
+
+# Setting up the file download toggles
+for k in ['original', 'embeddings', 'reduction', 'labels']:
+    if 'dl_' + k not in st.session_state:
+        st.session_state['dl_' + k] = False
 
 # And finally the plotting options
 if 'map_in_3d' not in st.session_state:
@@ -325,24 +335,6 @@ else:
     has_clusters = False
     has_aggl = False
 
-
-@st.dialog('Load your Data')
-def load_dialog():
-    st.radio('What kind of data do you want to load?',
-             options=list(st.session_state.data_type_dict.keys()),
-             key='_data_type',
-             on_change=strml.update_settings,
-             kwargs={'keys': ['data_type']},
-             help="The kind of data you want to load. If you don't have \
-             embeddings made yet, choose tabular data or bulk documents, \
-             depending on how your text is saved, to get started.")
-    st.file_uploader(label='Select the file(s)',
-                     type=st.session_state.data_type_dict[st.session_state.data_type],
-                     key='_source_file',
-                     accept_multiple_files=st.session_state.data_type == 'Bulk documents',
-                     on_change=strml.load_file)
-
-
 with st.sidebar:
     with st.expander('Load', expanded=not (has_source or has_data)):
         st.radio('What kind of data do you want to load?',
@@ -360,39 +352,41 @@ with st.sidebar:
                          on_change=strml.load_file)
         if has_metadata:
             pass
-    with st.expander('Embed', expanded=(not has_embeddings) and
-                     (has_data or has_source)):
-            if tabular_source and has_source:
-                st.selectbox('Text Column',
-                             key='_text_column',
-                             index=st.session_state.text_column,
-                             options=st.session_state.source_file.columns.values,
-                             on_change=strml.set_text,
-                             help="Choose the column in your dataset holding the \
-                             text you'd like to embed.")
-            st.selectbox(
-                label='Type',
-                key='_embedding_type',
-                on_change=strml.update_settings,
-                kwargs={'keys': ['embedding_type']},
-                options=['document', 'sentence'],
-                help="Whether you'd like to make embeddings for each 'document' \
-                in your dataset (documents being text contained by a single \
-                spreadhseet cell) or for the sentences in all the documents."
-            )
-            st.selectbox(
-                label='Model',
-                key='_embedding_model',
-                on_change=strml.update_settings,
-                kwargs={'keys': ['embedding_model']},
-                options=['ada-002'],
-                help='The model that will generate the embeddings. For more info \
-                about the different models, see the README.'
-            )
-            st.button(label='Generate embeddings',
-                      key='_embed_go',
-                      disabled=(not st.session_state.enable_generate_button),
-                      on_click=strml.fetch_embeddings)
+    if not st.session_state.premade_loaded:
+        with st.expander('Embed', expanded=(not has_embeddings) and
+                         (has_data or has_source)):
+                if tabular_source and has_source:
+                    st.selectbox('Text Column',
+                                 key='_text_column',
+                                 index=st.session_state.text_column,
+                                 options=st.session_state.source_file.columns.values,
+                                 on_change=strml.set_text,
+                                 kwargs={'col': 'text_column'},
+                                 help="Choose the column in your dataset holding the \
+                                 text you'd like to embed.")
+                st.selectbox(
+                    label='Type',
+                    key='_embedding_type',
+                    on_change=strml.update_settings,
+                    kwargs={'keys': ['embedding_type']},
+                    options=['document'],
+                    help="Whether you'd like to make embeddings for each 'document' \
+                    in your dataset (documents being text contained by a single \
+                    spreadhseet cell) or for the sentences in all the documents."
+                )
+                st.selectbox(
+                    label='Model',
+                    key='_embedding_model',
+                    on_change=strml.update_settings,
+                    kwargs={'keys': ['embedding_model']},
+                    options=['ada-002'],
+                    help='The model that will generate the embeddings. For more info \
+                    about the different models, see the README.'
+                )
+                st.button(label='Generate embeddings',
+                          key='_embed_go',
+                          disabled=(not st.session_state.enable_generate_button),
+                          on_click=strml.fetch_embeddings)
     with st.expander('Reduce', expanded=(not has_reduction) and
                      has_embeddings):
         st.selectbox(label='Method',
@@ -523,30 +517,38 @@ with st.sidebar:
                           current session.")
             st.form_submit_button('Run algorithm',
                                   on_click=strml.run_clustering)
-    with st.expander('Label', expanded=has_clusters):
-        st.selectbox('Method',
-                     options=['By keywords', 'With a summary'],
-                     key='_label_how',
-                     placeholder=st.session_state.label_how,
-                     on_change=strml.update_settings,
-                     kwargs={'keys': ['label_how']},
-                     help="How you'd like to label the documents in each \
-                     cluster. 'By keywords' will generate a list of keywords \
-                     for each cluster, and 'With a summary' will ask ChatGPT \
-                     to produce a summary of each one.")
-        if st.session_state.label_how == 'By keywords':
-            st.selectbox('Keyword type',
-                         options=['TF-IDF', 'LLM'],
-                         key='_keyword_type',
-                         placeholder=st.session_state.keyword_type,
-                         help="How you'd like to generate a list of keywords \
-                         for each cluster. 'TF-IDF' does this by looking at how \
-                         often words occur in each cluster versus the others, \
-                         and 'LLM' will do this by sending a random sample of \
-                         documents from each cluster to ChatGPT and asking it \
-                         to generate a list of keywords from each one.")
-            st.button('Generate labels',
-                      on_click=strml.name_clusters)
+    if has_metadata and has_clusters:
+        with st.expander('Label', expanded=has_clusters):
+            if st.session_state.text_column is None:
+                st.selectbox('Text Column',
+                             key='_label_text_column',
+                             options=td.metadata.columns.values,
+                             on_change=strml.update_settings,
+                             disabled=True,
+                             kwargs={'keys': ['label_text_column']})
+            st.selectbox('Method',
+                         options=['By keywords', 'With a summary'],
+                         key='_label_how',
+                         placeholder=st.session_state.label_how,
+                         on_change=strml.update_settings,
+                         kwargs={'keys': ['label_how']},
+                         help="How you'd like to label the documents in each \
+                         cluster. 'By keywords' will generate a list of keywords \
+                         for each cluster, and 'With a summary' will ask ChatGPT \
+                         to produce a summary of each one.")
+            if st.session_state.label_how == 'By keywords':
+                st.selectbox('Keyword type',
+                             options=['TF-IDF', 'LLM'],
+                             key='_keyword_type',
+                             placeholder=st.session_state.keyword_type,
+                             help="How you'd like to generate a list of keywords \
+                             for each cluster. 'TF-IDF' does this by looking at how \
+                             often words occur in each cluster versus the others, \
+                             and 'LLM' will do this by sending a random sample of \
+                             documents from each cluster to ChatGPT and asking it \
+                             to generate a list of keywords from each one.")
+                st.button('Generate labels',
+                          on_click=strml.name_clusters)
     with st.expander('Plot', expanded=has_reduction):
         if has_reduction:
             st.selectbox('Choose a reduction',
@@ -650,7 +652,15 @@ with st.sidebar:
                                reduced-dimension embeddings, along with any \
                                cluster IDs that were generated for them.')
             if has_clusters:
-                pass
+                topics = []
+                mods = list(td.reductions[cr].cluster_models.values())
+                for mod in mods:
+                    topics.append(pd.DataFrame(mod.topics))
+                topics = pd.concat(topics, axis=0).to_csv(index=False)
+                st.download_button(label='Cluster summaries',
+                                   data=topics,
+                                   mime='text/csv',
+                                   key='_label_save')
             if has_aggl:
                 mod = td.reductions[cr]['cluster_models']['aggl']
                 fig = data.make_dendrogram(mod)

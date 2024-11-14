@@ -87,9 +87,10 @@ def load_file():
                 embeddings = pd.read_csv(sf)
             except:
                 embeddings = pd.read_csv(sf, encoding='latin')
+            st.session_state.premade_loaded = True
             td = TextData(embeddings=embeddings)
             td.precomputed_knn = compute_nn(embeddings=embeddings)
-            td.reduce(method='UMAP')
+            #td.reduce(method='UMAP')
             st.session_state.current_text_data = 'documents'
             st.session_state.text_data_dict.update({'documents': td})
             st.session_state.current_reduction = td.last_reduction
@@ -112,11 +113,11 @@ def fetch_td(td_name):
     return st.session_state.text_data_dict[td_name]
 
 
-def set_text():
+def set_text(col):
     """Adds the text to be embedded to the session state. Only applies when
     tabular data is used for the input.
     """
-    text_col = st.session_state._text_column
+    text_col = st.session_state['_' + col]
     sf = st.session_state.source_file.dropna(axis=0, subset=text_col)
     sf[text_col] = sf[text_col].astype(str)
     docs = [str(d) for d in sf[text_col]]
@@ -201,3 +202,48 @@ def name_clusters():
                      method='TF-IDF',
                      model=model)
     return
+
+
+@st.dialog('Download Session Data')
+def download_dialog():
+    """Creates a modal dialog for downloading session data."""
+    tdd = st.session_state.text_data_dict
+    emb_types = list(tdd.keys())
+    dl_select = st.form('dl_select_form')
+    with dl_select:
+        if len(emb_types) > 1:
+            st.write('Which embeddings are you working with?')
+            st.selectbox('', key='_dl_emb_typ',
+                         options=emb_types)
+        st.write('What files would you like to download?')
+        dl_original = st.checkbox('Original data')
+        dl_embeddings = st.checkbox('Raw embeddings')
+        dl_reduction = st.checkbox('Reduced embeddings')
+        dl_labels = st.checkbox('Cluster labels')
+        st.form_submit_button('Save')
+    st.download_button('Test')
+
+
+@st.dialog('Load Data')
+def load_dialog():
+    """Creates a modal dialog for uploading the initial data."""
+    data_type = st.radio('What kind of data do you want to load?',
+                         options=list(st.session_state.data_type_dict.keys()),
+                          help="The kind of data you want to load. If you don't have \
+                          embeddings made yet, choose tabular data or bulk documents, \
+                          depending on how your text is saved, to get started.")
+    st.file_uploader(label='Select the file(s)',
+                     type=st.session_state.data_type_dict[st.session_state.data_type],
+                     key='_source_file',
+                     accept_multiple_files=st.session_state.data_type == 'Bulk documents',
+                     on_change=load_file,
+                     kwargs={'data_type': data_type})
+    if st.session_state.source_file is not None:
+        st.rerun()
+
+
+@st.dialog('Switch Projection')
+def switch_dialog():
+    """Creates a modal dialog that allows the user to choose a specific
+    embedding type and data reduction for analysis and plotting.
+    """

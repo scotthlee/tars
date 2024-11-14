@@ -74,6 +74,7 @@ class TextData:
     def name_clusters(self,
                       reduction,
                       model,
+                      docs=None,
                       method='TF-IDF',
                       top_k=10,
                       norm='l1',
@@ -83,11 +84,13 @@ class TextData:
         two approaches: cluster TF-IDF (the last step of BERTopic), or direct
         labeling with ChatGPT.
         """
+        if docs is None:
+            docs = self.text
         self.reductions[reduction].name_clusters(model=model,
                                                  method=method,
                                                  top_k=top_k,
                                                  norm=norm,
-                                                 docs=self.text,
+                                                 docs=docs,
                                                  main_kwargs=main_kwargs,
                                                  aux_kwargs=aux_kwargs)
         return
