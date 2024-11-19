@@ -192,7 +192,8 @@ cluster_defaults = {
     'HDBSCAN': {
             'min_cluster_size': 5,
             'min_samples': None,
-            'cluster_selection_epsilon': 0.0
+            'cluster_selection_epsilon': 0.0,
+            'store_centers': 'both'
     },
     'k-means': {
             'n_clusters': 8,
@@ -218,8 +219,7 @@ cluster_dict = {
     'HDBSCAN': {
         'sklearn_name': 'HDBSCAN',
         'lower_name': 'hdbscan',
-        'params': ['min_cluster_size', 'min_samples'],
-        'param_abrevs': ['min_size', 'min_samp']
+        'params': ['min_cluster_size', 'min_samples', 'store_centers']
     },
     'k-means': {
         'sklearn_name': 'KMeans',
@@ -517,38 +517,6 @@ with st.sidebar:
                           current session.")
             st.form_submit_button('Run algorithm',
                                   on_click=strml.run_clustering)
-    if has_metadata and has_clusters:
-        with st.expander('Label', expanded=has_clusters):
-            if st.session_state.text_column is None:
-                st.selectbox('Text Column',
-                             key='_label_text_column',
-                             options=td.metadata.columns.values,
-                             on_change=strml.update_settings,
-                             disabled=True,
-                             kwargs={'keys': ['label_text_column']})
-            st.selectbox('Method',
-                         options=['By keywords', 'With a summary'],
-                         key='_label_how',
-                         placeholder=st.session_state.label_how,
-                         on_change=strml.update_settings,
-                         kwargs={'keys': ['label_how']},
-                         help="How you'd like to label the documents in each \
-                         cluster. 'By keywords' will generate a list of keywords \
-                         for each cluster, and 'With a summary' will ask ChatGPT \
-                         to produce a summary of each one.")
-            if st.session_state.label_how == 'By keywords':
-                st.selectbox('Keyword type',
-                             options=['TF-IDF', 'LLM'],
-                             key='_keyword_type',
-                             placeholder=st.session_state.keyword_type,
-                             help="How you'd like to generate a list of keywords \
-                             for each cluster. 'TF-IDF' does this by looking at how \
-                             often words occur in each cluster versus the others, \
-                             and 'LLM' will do this by sending a random sample of \
-                             documents from each cluster to ChatGPT and asking it \
-                             to generate a list of keywords from each one.")
-                st.button('Generate labels',
-                          on_click=strml.name_clusters)
     with st.expander('Plot', expanded=has_reduction):
         if has_reduction:
             st.selectbox('Choose a reduction',

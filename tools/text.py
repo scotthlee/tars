@@ -71,7 +71,7 @@ class TextData:
                                            aux_kwargs=aux_kwargs)
         return
 
-    def name_clusters(self,
+    def generate_cluster_keywords(self,
                       reduction,
                       model,
                       docs=None,
@@ -86,13 +86,13 @@ class TextData:
         """
         if docs is None:
             docs = self.text
-        self.reductions[reduction].name_clusters(model=model,
-                                                 method=method,
-                                                 top_k=top_k,
-                                                 norm=norm,
-                                                 docs=docs,
-                                                 main_kwargs=main_kwargs,
-                                                 aux_kwargs=aux_kwargs)
+        self.reductions[reduction].generate_cluster_keywords(model=model,
+                                                             method=method,
+                                                             top_k=top_k,
+                                                             norm=norm,
+                                                             docs=docs,
+                                                             main_kwargs=main_kwargs,
+                                                             aux_kwargs=aux_kwargs)
         return
 
 

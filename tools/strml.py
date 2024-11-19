@@ -32,10 +32,13 @@ def unkeep(key):
 def update_settings(keys, toast=True, toast_icon='👍'):
     """Wrapper for keep() that runs through a list of keys."""
     for key in keys:
-        keep(key)
+        if '_' + key in st.session_state:
+            keep(key)
+        else:
+            return
     if toast:
         st.toast('Settings updated!', icon=toast_icon)
-    pass
+    return
 
 
 def generate_disclaimer():
@@ -191,16 +194,16 @@ def switch_reduction():
     return
 
 
-def name_clusters():
+def generate_cluster_keywords():
     """Generates cluster names as topic lists. Currently only one method,
     cluster-based TF-IDF, from BERTopic, is supported.
     """
     td = fetch_td(st.session_state.current_text_data)
     reduction = st.session_state.current_reduction
     model = st.session_state.clustering_algorithm
-    td.name_clusters(reduction=st.session_state.current_reduction,
-                     method='TF-IDF',
-                     model=model)
+    td.generate_cluster_keywords(reduction=st.session_state.current_reduction,
+                                 method='TF-IDF',
+                                 model=model)
     return
 
 

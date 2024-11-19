@@ -54,16 +54,21 @@ class ClusterModel:
         with st.spinner('Running the clustering algorithm...'):
             mod.fit(X)
         if algo == 'DBSCAN':
-            self.centers = mod.core_sample_indices_
+            centers = mod.core_sample_indices_
         elif algo == 'KMeans':
-            self.centers = mod.cluster_centers_
+            centers = mod.cluster_centers_
+        elif algo == 'HDBSCAN':
+            centers = mod.centroids_
         labels = np.array(mod.labels_).astype(str)
+        self.centers = centers
         self.labels = pd.DataFrame(labels, columns=[lower_name + '_id'])
         self.model = mod
         self.params = kwargs
+        self.counts = pd.crosstab(self.labels[lower_name + '_id'], 'count')
         return
 
-    def name_clusters(self,
+
+    def generate_keywords(self,
                       docs,
                       method='TF-IDF',
                       norm='l1',
@@ -134,10 +139,7 @@ class EmbeddingReduction:
             self.label_df[mod.labels.columns.values] = mod.labels
         return
 
-    def fit(self, X,
-            do_scale=False,
-            main_kwargs={},
-            aux_kwargs={}):
+    def fit(self, X, do_scale=False, main_kwargs={}, aux_kwargs={}):
         """Performs dimensionality reduction on a set of embeddings. \
         Algorithm options are PCA, UMAP, and t-SNE."""
         reduction_method = self.method
@@ -182,7 +184,7 @@ class EmbeddingReduction:
             name_str = 'PCA'
         self.name = name_str
 
-    def name_clusters(self,
+    def generate_cluster_keywords(self,
                       model,
                       docs,
                       method='TF-IDF',
@@ -193,12 +195,12 @@ class EmbeddingReduction:
         """Names clusters based on the text samples they contain. Uses one of
         two approaches: cluster TF-IDF (the last step of BERTopic), or direct
         labeling with ChatGPT."""
-        self.cluster_models[model].name_clusters(method=method,
-                                                 top_k=top_k,
-                                                 norm=norm,
-                                                 docs=docs,
-                                                 main_kwargs=main_kwargs,
-                                                 aux_kwargs=aux_kwargs)
+        self.cluster_models[model].generate_keywords(method=method,
+                                                     top_k=top_k,
+                                                     norm=norm,
+                                                     docs=docs,
+                                                     main_kwargs=main_kwargs,
+                                                     aux_kwargs=aux_kwargs)
 
 
 def make_dendrogram(model, as_bytes=True):
