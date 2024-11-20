@@ -93,7 +93,7 @@ def load_file():
             st.session_state.premade_loaded = True
             td = TextData(embeddings=embeddings)
             td.precomputed_knn = compute_nn(embeddings=embeddings)
-            #td.reduce(method='UMAP')
+            td.reduce(method='UMAP')
             st.session_state.current_text_data = 'documents'
             st.session_state.text_data_dict.update({'documents': td})
             st.session_state.current_reduction = td.last_reduction

@@ -620,13 +620,14 @@ with st.sidebar:
                                reduced-dimension embeddings, along with any \
                                cluster IDs that were generated for them.')
             if has_clusters:
-                topics = []
+                keywords = []
                 mods = list(td.reductions[cr].cluster_models.values())
                 for mod in mods:
-                    topics.append(pd.DataFrame(mod.topics))
-                topics = pd.concat(topics, axis=0).to_csv(index=False)
+                    keywords.append(pd.DataFrame(mod.keywords))
+                keywords = pd.concat(keywords, axis=0).to_csv(index=False)
                 st.download_button(label='Cluster summaries',
-                                   data=topics,
+                                   file_name='cluster_keywords.csv',
+                                   data=keywords,
                                    mime='text/csv',
                                    key='_label_save')
             if has_aggl:

@@ -6,6 +6,7 @@ import streamlit as st
 from copy import deepcopy
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
+from sklearn.metrics import silhouette_score
 from sklearn.cluster import KMeans, DBSCAN, HDBSCAN, AgglomerativeClustering
 from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
 from sklearn.preprocessing import normalize, scale
@@ -21,7 +22,8 @@ class ClusterModel:
         self.centers = None
         self.model = None
         self.labels = None
-        self.topics = None
+        self.keywords = None
+        self.counts = None
         self.model_name = model_name
         self.model_choices = {
             'DBSCAN': {
@@ -46,27 +48,51 @@ class ClusterModel:
             main_kwargs={},
             aux_kwargs={}):
         """Fits the chosen clustering model to the data."""
+        # Setting up the sklearn function and associated args
         algo = self.model_name
         mod_name = self.model_choices[algo]['sklearn_name']
         lower_name = self.model_choices[algo]['lower_name']
         kwargs = {**main_kwargs, **aux_kwargs}
         mod = globals()[mod_name](**kwargs)
+
+        # Fit the underlying model
         with st.spinner('Running the clustering algorithm...'):
             mod.fit(X)
-        if algo == 'DBSCAN':
-            centers = mod.core_sample_indices_
-        elif algo == 'KMeans':
-            centers = mod.cluster_centers_
-        elif algo == 'HDBSCAN':
-            centers = mod.centroids_
+
+        # Set some class-level attributes, like the cluster ID data frame and
+        # the sklearn model name
         labels = np.array(mod.labels_).astype(str)
-        self.centers = centers
-        self.labels = pd.DataFrame(labels, columns=[lower_name + '_id'])
+        id_str = lower_name + '_id'
+        self.labels = pd.DataFrame(labels, columns=[id_str])
         self.model = mod
         self.params = kwargs
-        self.counts = pd.crosstab(self.labels[lower_name + '_id'], 'count')
+        self.counts = pd.crosstab(self.labels[id_str], 'count')
+
+        # Calculate the cluster-based scoring metrics
+        self._calculate_centers(X, id_str)
+        self._calculate_metrics(X, id_str)
+
         return
 
+    def _calculate_centers(self, X, id):
+        if self.labels is not None:
+            X[id] = self.labels[id]
+            by_cluster = X.groupby(id, as_index=False)
+            self.centers = by_cluster.mean(numeric_only=True)
+        return
+
+    def _calculate_metrics(self, X, id):
+        if self.labels is not None:
+            if self.centers is None:
+                self._calculate_centers(X, id)
+            centers = self.centers.drop(id, axis=1)
+            X[id] = self.labels[id]
+            grouped = X.groupby(id)
+            w_vars = grouped.var(numeric_only=True).sum(axis=1)
+            c_vars = centers.var(numeric_only=True).sum()
+            self.icc = c_vars / (w_vars.mean() + c_vars)
+            self.silhouette = silhouette_score(X, X[id])
+        return
 
     def generate_keywords(self,
                       docs,
@@ -112,7 +138,7 @@ class ClusterModel:
                     row_terms.append(reverse_vocab.get(k, k))
                 sorted_terms.append(row_terms)
             sorted_terms = np.array(sorted_terms)
-            self.topics = sorted_terms
+            self.keywords = sorted_terms
 
         return
 
@@ -129,7 +155,7 @@ class EmbeddingReduction:
     def cluster(self, method='HDBSCAN', main_kwargs={}, aux_kwargs={}):
         """Adds a ClusterModel to the current reduction."""
         mod = ClusterModel(model_name=method)
-        mod.fit(X=self.points,
+        mod.fit(X=deepcopy(self.points),
                 main_kwargs=main_kwargs,
                 aux_kwargs=aux_kwargs)
         self.cluster_models.update({mod.model_name: mod})
