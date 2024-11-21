@@ -83,7 +83,7 @@ def load_file():
                 docs.append(doc)
             td = TextData(docs=docs)
             st.session_state.source_file = docs[0]
-            st.session_state.current_text_data = 'documents'
+            st.session_state.embedding_type_select = 'documents'
             st.session_state.text_data_dict.update({'documents': td})
         elif data_type == 'Premade embeddings':
             try:
@@ -94,7 +94,7 @@ def load_file():
             td = TextData(embeddings=embeddings)
             td.precomputed_knn = compute_nn(embeddings=embeddings)
             td.reduce(method='UMAP')
-            st.session_state.current_text_data = 'documents'
+            st.session_state.embedding_type_select = 'documents'
             st.session_state.text_data_dict.update({'documents': td})
             st.session_state.current_reduction = td.last_reduction
             st.session_state.data_type_dict.update({'Metadata': ['csv']})
@@ -103,7 +103,7 @@ def load_file():
                 metadata = pd.read_csv(sf)
             except:
                 metadata = pd.read_csv(sf, encoding='latin')
-            td = fetch_td(st.session_state.current_text_data)
+            td = fetch_td(st.session_state.embedding_type_select)
             td.metadata = metadata
             st.session_state.text_data_dict.update({'documents': td})
     return
@@ -137,7 +137,7 @@ def set_text(col):
 def fetch_embeddings():
     """Generates embeddings for the user's text, along with the associated \
     PCA reduction for initial visualization."""
-    td = fetch_td(st.session_state.current_text_data)
+    td = fetch_td(st.session_state.embedding_type_select)
     if td is not None:
         td.embed(model_name=st.session_state.embedding_model)
         reduce_dimensions()
@@ -176,7 +176,7 @@ def run_clustering():
     main_kwargs = {p.replace(lower_name + '_', ''):
         st.session_state[p] for p in param_names}
     aux_kwargs = ast.literal_eval(st.session_state.cluster_kwargs)
-    td = fetch_td(st.session_state.current_text_data)
+    td = fetch_td(st.session_state.embedding_type_select)
     td.cluster(reduction=st.session_state.current_reduction,
                method=algo,
                main_kwargs=main_kwargs,
@@ -243,10 +243,3 @@ def load_dialog():
                      kwargs={'data_type': data_type})
     if st.session_state.source_file is not None:
         st.rerun()
-
-
-@st.dialog('Switch Projection')
-def switch_dialog():
-    """Creates a modal dialog that allows the user to choose a specific
-    embedding type and data reduction for analysis and plotting.
-    """

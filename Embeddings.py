@@ -129,6 +129,10 @@ if 'frequency_penalty' not in st.session_state:
     st.session_state.frequency_penalty = openai_defaults['chat']['frequency_penalty']
 
 # Setting up the I?O objects
+if 'embedding_type_select' not in st.session_state:
+    st.session_state.embedding_type_select = None
+if 'reduction_select' not in st.session_state:
+    st.session_state.reduction_select = None
 if 'premade_loaded' not in st.session_state:
     st.session_state.premade_loaded = False
 if 'text_data_dict' not in st.session_state:
@@ -274,7 +278,7 @@ for k in ['original', 'embeddings', 'reduction', 'labels']:
     if 'dl_' + k not in st.session_state:
         st.session_state['dl_' + k] = False
 
-# And finally the plotting options
+# Setting up the plotting options
 if 'map_in_3d' not in st.session_state:
     st.session_state.map_in_3d = True
 if 'label_columns' not in st.session_state:
@@ -302,6 +306,16 @@ if 'show_legend' not in st.session_state:
 if st.session_state.map_in_3d:
     st.session_state.hover_data.update({'d3': False})
 
+# Setting up the summary report options
+if 'summary_description' not in st.session_state:
+    st.session_state.summary_description = ''
+if 'summary_top_questions' not in st.session_state:
+    st.session_state.summary_top_questions = 'Question 1\nQuestion 2\n...'
+if 'summary_cluster_choice' not in st.session_state:
+    st.session_state.cluster_choice = None
+if 'summary_methods_section' not in st.session_state:
+    st.session_state.summary_methods_section = False
+
 # Loading the handful of variables that don't persist across pages
 to_load = ['text_column', 'data_type']
 for key in to_load:
@@ -309,7 +323,7 @@ for key in to_load:
         strml.unkeep(key)
 
 # Specifying the current text data object for shorthand
-td_name = st.session_state.current_text_data
+td_name = st.session_state.embedding_type_select
 has_data = td_name is not None
 has_source = st.session_state.source_file is not None
 tabular_source = st.session_state.data_type == 'Tabular data with text column'
@@ -519,17 +533,6 @@ with st.sidebar:
                                   on_click=strml.run_clustering)
     with st.expander('Plot', expanded=has_reduction):
         if has_reduction:
-            st.selectbox('Choose a reduction',
-                         index=None,
-                         key='_current_reduction',
-                         options=list(td.reductions.keys()),
-                         placeholder=st.session_state.current_reduction,
-                         on_change=strml.switch_reduction,
-                         help='Choose a lower-dimension version of the \
-                         embeddings to display. PCA is calculated and \
-                         displayed by default, but you can add other \
-                         reductions to the list using the "Reduce" widget \
-                         above.')
             if (has_metadata) or (has_clusters):
                 display_cols = []
                 if has_clusters:
@@ -600,6 +603,50 @@ with st.sidebar:
                   help='How tall you want the scatterplot to be. It will fill \
                   the width of the screen by default, but the height is \
                   adjustable.')
+    if has_clusters:
+        with st.expander('Summarize', expanded=False):
+            with st.form(key='summary_form', border=False):
+                dataset_description = st.text_area(
+                    label='Dataset description',
+                    key='_summary_description',
+                    help="Generally, what is the text in your dataset about? For \
+                    example, if they come from a scientific study, you might \
+                    describe the setting and goals of the study. This will \
+                    serve as context for ChatGPT as it summarizes the \
+                    information in the dataset."
+                )
+                top_questions = st.text_area(
+                    label='Top questions',
+                    key='_summary_top_questions',
+                    placeholder=st.session_state.summary_top_questions,
+                    help="What are the most important questions you'd like \
+                    answered about the text in your dataset? Please write each \
+                    question on its own line."
+                )
+                cluster_choice = st.selectbox(
+                    label='Clustering choice',
+                    key='_summary_cluster_choice',
+                    options=td.reductions[cr].label_df.columns.values,
+                    help="Which clustering result would you like to use to \
+                    group the embeddings? Each cluster will be summarized on \
+                    its own, and the then those summaries will be used to \
+                    produce a top-level summary for the whole datset."
+                )
+                methods_toggle = st.toggle(
+                    label='Include methods section',
+                    key='_summary_methods_section',
+                    value=st.session_state.summary_methods_section,
+                    help="Whether to include a methods section in the summary \
+                    report with information about your chosen embedding model, \
+                    dimensionality-reduction algorithm, and clustering \
+                    algorithm."
+                )
+                st.form_submit_button('Generate report',
+                                      on_click=strml.update_settings,
+                                      kwargs={'keys': ['summary_description',
+                                                       'summary_top_questions',
+                                                       'summary_methods_section']}
+                )
     with st.expander('Download', expanded=False):
         if has_embeddings:
             st.download_button(label='Embeddings',
@@ -625,7 +672,7 @@ with st.sidebar:
                 for mod in mods:
                     keywords.append(pd.DataFrame(mod.keywords))
                 keywords = pd.concat(keywords, axis=0).to_csv(index=False)
-                st.download_button(label='Cluster summaries',
+                st.download_button(label='Cluster keywords',
                                    file_name='cluster_keywords.csv',
                                    data=keywords,
                                    mime='text/csv',
@@ -642,6 +689,26 @@ with st.sidebar:
                                    help='Downloads the clustering dendrogram.')
 
 # Making the main visualization
+if has_reduction:
+    cols = st.columns(5)
+    with cols[0]:
+        embedding_select = st.selectbox(
+            label='Base embeddings',
+            options=list(st.session_state.text_data_dict.keys()),
+            key='_embedding_type_select',
+            help='Which embeddings would you like to work with?',
+            on_change=strml.update_settings,
+            kwargs={'keys': ['embedding_type_select']}
+        )
+    with cols[1]:
+        st.selectbox('Reduction',
+                     index=None,
+                     key='_current_reduction',
+                     options=list(td.reductions.keys()),
+                     placeholder=st.session_state.current_reduction,
+                     on_change=strml.switch_reduction,
+                     help='Which dimensionally-reduced version of the \
+                     embeddings would you like to work with?')
 with st.container(border=True):
     if has_reduction:
         # Construct the hover columns
@@ -665,7 +732,6 @@ with st.container(border=True):
         if st.session_state.map_in_3d:
             fig = px.scatter_3d(data_frame=display_data,
                                 x='d1', y='d2', z='d3',
-                                title=st.session_state.current_reduction,
                                 hover_data=hover_data,
                                 color=st.session_state.color_column,
                                 opacity=st.session_state.marker_opacity,
@@ -674,7 +740,6 @@ with st.container(border=True):
             fig = px.scatter(data_frame=display_data,
                              x='d1', y='d2',
                              hover_data=hover_data,
-                             title=st.session_state.current_reduction,
                              color=st.session_state.color_column,
                              opacity=st.session_state.marker_opacity,
                              height=st.session_state.plot_height)
