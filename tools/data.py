@@ -1,15 +1,19 @@
 import numpy as np
 import pandas as pd
-import io
 import streamlit as st
 
+from copy import deepcopy
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
+from sklearn.metrics import silhouette_score
 from sklearn.cluster import KMeans, DBSCAN, HDBSCAN, AgglomerativeClustering
+from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
+from sklearn.preprocessing import normalize, scale
 from umap import UMAP
 from umap.umap_ import nearest_neighbors
 from matplotlib import pyplot as plt
 from scipy.cluster.hierarchy import dendrogram
+from scipy.stats import rankdata
 
 
 class ClusterModel:
@@ -18,6 +22,8 @@ class ClusterModel:
         self.centers = None
         self.model = None
         self.labels = None
+        self.keywords = None
+        self.counts = None
         self.model_name = model_name
         self.model_choices = {
             'DBSCAN': {
@@ -38,26 +44,149 @@ class ClusterModel:
             }
         }
 
-    def fit(self, X, kwargs={}):
+    def fit(self, X,
+            main_kwargs={},
+            aux_kwargs={}):
         """Fits the chosen clustering model to the data."""
-        self.model.fit(X, **kwargs)
-        self.params = kwargs
+        # Setting up the sklearn function and associated args
         algo = self.model_name
         mod_name = self.model_choices[algo]['sklearn_name']
         lower_name = self.model_choices[algo]['lower_name']
-        mod = globals()[algo](**kwargs)
+        kwargs = {**main_kwargs, **aux_kwargs}
+        mod = globals()[mod_name](**kwargs)
+
+        # Doing a deep copy so as not to change the input data
+        X = deepcopy(X)
+
+        # Fit the underlying model
         with st.spinner('Running the clustering algorithm...'):
             mod.fit(X)
-        if algo == 'DBSCAN':
-            self.centers = mod.core_sample_indices_
-        elif algo == 'KMeans':
-            self.centers = mod.cluster_centers_
+
+        # Set some class-level attributes, like the cluster ID data frame and
+        # the sklearn model name
         labels = np.array(mod.labels_).astype(str)
-        label_df[lower_name + '_id'] = labels
-        self.labels = label_df
+        id_str = lower_name + '_id'
+        self.labels = pd.DataFrame(labels, columns=[id_str])
         self.model = mod
+        self.params = kwargs
+
+        # Calculate cluster size
+        ids = self.labels[id_str].unique()
+        counts = {}
+        for id in ids:
+            id_samp = self.labels[self.labels[id_str] == id]
+            counts.update({id : id_samp.shape[0]})
+        self.counts = counts
+        count_ranks = rankdata(list(counts.values()))
+        self.count_ranks = {id: count_ranks[i] for i, id in enumerate(ids)}
+
+        # Calculate intracluster variances
+        vars = {}
+        for id in ids:
+            id_rows = np.where(self.labels[id_str] == id)[0]
+            id_samp = X.iloc[id_rows, :]
+            vars.update({id: id_samp.var().sum()})
+        self.vars = vars
+        var_ranks = rankdata(list(vars.values()))
+        self.var_ranks = {id: var_ranks[i] for i, id in enumerate(ids)}
+
+        # Calculate the cluster centers and scoring metrics
+        self._calculate_centers(X, id_str)
+        self._calculate_metrics(X, id_str)
+
         return
 
+    def _calculate_centers(self, X, id):
+        """Calculates the mean (i.e., the centroid) for each cluster."""
+        if self.labels is not None:
+            X[id] = self.labels[id]
+            by_cluster = X.groupby(id, as_index=False)
+            self.centers = by_cluster.mean(numeric_only=True)
+        return
+
+    def _calculate_metrics(self, X, id):
+        """Calculates a few metrics for measuring cluster quality."""
+        if self.labels is not None:
+            if self.centers is None:
+                self._calculate_centers(X, id)
+            centers = self.centers.drop(id, axis=1)
+            X[id] = self.labels[id]
+            grouped = X.groupby(id)
+            w_vars = grouped.var(numeric_only=True).sum(axis=1)
+            c_vars = centers.var(numeric_only=True).sum()
+            self.icc = c_vars / (w_vars.mean() + c_vars)
+            self.silhouette = silhouette_score(X, X[id])
+        return
+
+    def generate_keywords(self,
+                          docs,
+                          method='TF-IDF',
+                          norm='l1',
+                          top_k=10,
+                          main_kwargs={},
+                          aux_kwargs={}):
+        """Geneates the to keywords for each cluster."""
+        # Merge docs with cluster IDs
+        lower_name = self.model_choices[self.model_name]['lower_name']
+        id_name = lower_name + '_id'
+        cluster_df = deepcopy(self.labels)
+        cluster_df['docs'] = docs
+        cluster_df.docs = cluster_df.docs.astype(str)
+
+        if method == 'TF-IDF':
+            # Merge the docs in each cluster
+            cluster_ids = cluster_df[id_name].unique()
+            clustered_docs = []
+            for id in cluster_ids:
+                doc_blob = ' '.join(cluster_df.docs[cluster_df[id_name] == id])
+                clustered_docs.append(doc_blob)
+
+            # Vectorize the clustered documents and fetch the vocabulary
+            veccer = CountVectorizer(stop_words='english')
+            count_vecs = veccer.fit_transform(clustered_docs)
+            vocab = veccer.vocabulary_
+            reverse_vocab = {vocab[k]: k for k in list(vocab.keys())}
+
+            # Conver the count vectors to TF-IDF vectors
+            tiffer = TfidfTransformer(norm=norm)
+            tfidf_vecs = tiffer.fit_transform(count_vecs).toarray()
+
+            # Get the top terms for each set of clustered docs based on TF-IDF
+            sorted = np.flip(np.argsort(tfidf_vecs, axis=1), axis=1)
+            sorted_terms = []
+            for r in sorted:
+                row_terms = []
+                for k in r[:top_k]:
+                    row_terms.append(reverse_vocab.get(k, k))
+                sorted_terms.append(row_terms)
+            sorted_terms = np.array(sorted_terms)
+
+            # Save the keywords as a dict
+            keyword_dict = {}
+            for i, id in enumerate(cluster_ids):
+                keyword_dict.update({id: [w for w in sorted_terms[i]]})
+            self.keywords = keyword_dict
+
+    def sample_points(self, max_count=20, min_count=5):
+        """Randomly samples points from each cluster."""
+        if self.labels is not None:
+            algo = self.model_name
+            lower_name = self.model_choices[algo]['lower_name']
+            id_str = lower_name + '_id'
+            ids = self.labels[id_str].unique()
+            out = {}
+            for id in ids:
+                samp = self.labels[self.labels[id_str] == id]
+                cluster_size = samp.shape[0]
+                if cluster_size > min_count:
+                    n = np.min([max_count, cluster_size])
+                    id_dict = {
+                        id: [i for i in samp.sample(n=n).index.values]
+                    }
+                else:
+                    id_dict = {id: [i for i in samp.index.values]}
+                out.update(id_dict)
+            return out
 
 
 class EmbeddingReduction:
@@ -68,8 +197,43 @@ class EmbeddingReduction:
         self.points = None
         self.label_df = None
         self.cluster_models = {}
+        self.cluster_names = {}
 
-    def name(self, param_vals):
+    def cluster(self, method='HDBSCAN', main_kwargs={}, aux_kwargs={}):
+        """Adds a ClusterModel to the current reduction."""
+        mod = ClusterModel(model_name=method)
+        mod.fit(X=deepcopy(self.points),
+                main_kwargs=main_kwargs,
+                aux_kwargs=aux_kwargs)
+        self.cluster_models.update({mod.model_name: mod})
+        if self.label_df is None:
+            self.label_df = mod.labels
+        else:
+            self.label_df[mod.labels.columns.values] = mod.labels
+        return
+
+    def fit(self, X, do_scale=False, main_kwargs={}, aux_kwargs={}):
+        """Performs dimensionality reduction on a set of embeddings. \
+        Algorithm options are PCA, UMAP, and t-SNE."""
+        reduction_method = self.method
+        dims = self.dimensions
+        kwargs = {**main_kwargs, **aux_kwargs}
+        if do_scale:
+            X = scale(X)
+        if reduction_method == 'PCA':
+            reducer = PCA(n_components=dims)
+        elif reduction_method == 'UMAP':
+            reducer = UMAP(n_components=dims, **kwargs)
+        elif reduction_method == 't-SNE':
+            reducer = TSNE(n_components=dims, **kwargs)
+        with st.spinner('Running ' + reduction_method + '...'):
+            reduction = reducer.fit_transform(X)
+        colnames = ['d' + str(i + 1) for i in range(dims)]
+        self.points = pd.DataFrame(reduction, columns=colnames)
+        self.name_reduction(list(main_kwargs.values()))
+        return
+
+    def name_reduction(self, param_vals):
         """Generates a string name for a particular reduction."""
         param_dict = {
             'UMAP': {
@@ -86,103 +250,34 @@ class EmbeddingReduction:
         if self.method != 'PCA':
             curr_name = param_dict[self.method]['name']
             param_abbrevs = param_dict[self.method]['param_abbrevs']
-            param_str = ', '.join([param_abbrevs[i] + '=' + param_vals[i]
+            param_str = ', '.join([param_abbrevs[i] + '=' + str(param_vals[i])
                                    for i in range(len(param_vals))])
-            name_str = curr_method + '(' + param_str + ')'
+            name_str = self.method + '(' + param_str + ')'
         else:
             name_str = 'PCA'
         self.name = name_str
 
-    def cluster(self, method='HDBSCAN', kwargs={}):
-        """Adds a ClusterModel to the current reduction."""
-        mod = ClusterModel(model_name=method)
-        mod.fit(self.points, kwargs=kwargs)
-        self.cluster_models.update({mod.name: mod})
-        if self.label_df is None:
-            self.label_df = mod.labels
-        else:
-            self.label_df[mod.labels.columns.values] = mod.labels
-        return
-
-    def reduce(self, X,
-               precomputed_knn=None,
-               n_neighbors=None,
-               min_dist=None,
-               n_iter=None,
-               perplexity=None,
-               kwargs={}
-               ):
-        """Performs dimensionality reduction on a set of embeddings. \
-        Algorithm options are PCA, UMAP, and t-SNE."""
-        reduction_method = self.method
-        dims = self.dimensions
-        if reduction_method == 'PCA':
-            reducer = PCA(n_components=dims)
-        elif reduction_method == 'UMAP':
-            reducer = UMAP(n_components=dims,
-                           precomputed_knn=precomputed_knn,
-                           n_neighbors=n_neighbors,
-                           min_dist=min_dist)
-        elif reduction_method == 't-SNE':
-            reducer = TSNE(n_components=dims,
-                           perplexity=perplexity,
-                           n_iter=n_iter)
-        with st.spinner('Running ' + reduction_method + '...'):
-            reduction = reducer.fit_transform(X, **kwargs)
-        colnames = ['d' + str(i + 1) for i in range(dims)]
-        self.points = pd.DataFrame(reduction, columns=colnames)
-        self.name_reduction()
-        return
+    def generate_cluster_keywords(self,
+                      model,
+                      docs,
+                      method='TF-IDF',
+                      top_k=10,
+                      norm='l1',
+                      main_kwargs={},
+                      aux_kwargs={}):
+        """Names clusters based on the text samples they contain. Uses one of
+        two approaches: cluster TF-IDF (the last step of BERTopic), or direct
+        labeling with ChatGPT."""
+        self.cluster_models[model].generate_keywords(method=method,
+                                                     top_k=top_k,
+                                                     norm=norm,
+                                                     docs=docs,
+                                                     main_kwargs=main_kwargs,
+                                                     aux_kwargs=aux_kwargs)
 
 
-
-def run_clustering():
-    """Runs a cluster analysis on the user's chosen reduction. Cluster IDs and \
-    centers are saved to the reduction's dictionary entry for plotting.
-    """
-    algo = st.session_state.clustering_algorithm
-    cd = st.session_state.cluster_dict
-    mod_name = cd[algo]['sklearn_name']
-    lower_name = cd[algo]['lower_name']
-    kwargs = {p: st.session_state[lower_name + '_' + p]
-              for p in cd[algo]['params']}
-    kwargs.update(st.session_state.cluster_kwargs)
-    mod = globals()[mod_name](**kwargs)
-    reduc_name = st.session_state.current_reduction
-    with st.spinner('Running the clustering algorithm...'):
-        mod.fit(st.session_state.reduction_dict[reduc_name]['points'])
-    centers = None
-    if algo == 'DBSCAN':
-        centers = mod.core_sample_indices_
-    elif algo == 'KMeans':
-        centers = mod.cluster_centers_
-    cluster_df = st.session_state.reduction_dict[reduc_name]['cluster_ids']
-    labels = np.array(mod.labels_).astype(str)
-    if cluster_df is not None:
-        cluster_df[lower_name + '_id'] = labels
-    else:
-        cluster_df = pd.DataFrame(mod.labels_, columns=[lower_name + '_id'])
-    st.session_state.reduction_dict[reduc_name]['cluster_ids'] = cluster_df.astype(str)
-    st.session_state.reduction_dict[reduc_name]['cluster_mods'].update({lower_name: mod})
-    return
-
-
-@st.dialog('Dendrogram')
-def show_dendrogram():
-    current_reduc = st.session_state.current_reduction
-    if 'aggl' not in st.session_state.reduction_dict[current_reduc]['cluster_mods']:
-        st.write('Please run the agglomerative clustering algorithm to see \
-                 a dendrogram.')
-    else:
-        mod = st.session_state.reduction_dict[current_reduc]['cluster_mods']['aggl']
-        fig = make_dendrogram(mod)
-        st.pyplot(fig=fig, clear_figure=True)
-    st.write('Hello!')
-
-
-def make_dendrogram(model, as_bytes=True):
-    # Create linkage matrix and then plot the dendrogram
-    # create the counts of samples under each node
+def make_dendrogram(model):
+    """Makes a dendrogram for an agglomerative clustering model."""
     counts = np.zeros(model.children_.shape[0])
     n_samples = len(model.labels_)
     for i, merge in enumerate(model.children_):
@@ -198,87 +293,19 @@ def make_dendrogram(model, as_bytes=True):
         [model.children_, model.distances_, counts]
     ).astype(float)
 
-    # Assemble the dendrogram
-
     # Make the plot
     fig = plt.figure()
     dn = dendrogram(linkage_matrix)
     return fig
 
 
-def compute_nn(embeddings=st.session_state.embeddings):
+def compute_nn(embeddings, n_neighbors=250, metric='euclidean'):
     """Pre-computes the nearest neighbors graph for UMAP."""
     with st.spinner('Calculating nearest neighbors...'):
         nn = nearest_neighbors(embeddings,
-                               n_neighbors=250,
-                               metric='euclidean',
+                               n_neighbors=n_neighbors,
+                               metric=metric,
                                metric_kwds=None,
                                angular=False,
                                random_state=None)
-    st.session_state.precomputed_nn = nn
-    return
-
-
-def reduce_dimensions(reduction_method=None):
-    """Performs dimensionality reduction on the current state's embeddings. \
-    Algorithm options are PCA, UMAP, and t-SNE."""
-    if reduction_method is None:
-        reduction_method = st.session_state.reduction_method
-    else:
-        st.session_state.reduction_method = reduction_method
-    dims = 3 if st.session_state.map_in_3d else 2
-    if reduction_method == 'PCA':
-        reducer = PCA(n_components=dims)
-    elif reduction_method == 'UMAP':
-        reducer = UMAP(n_components=dims,
-                       precomputed_knn=st.session_state.precomputed_nn,
-                       n_neighbors=st.session_state.umap_n_neighbors,
-                       min_dist=st.session_state.umap_min_dist)
-    elif reduction_method == 't-SNE':
-        reducer = TSNE(n_components=dims,
-                       perplexity=st.session_state.tsne_perplexity,
-                       n_iter=st.session_state.tsne_n_iter)
-    with st.spinner('Running ' + reduction_method + '...'):
-        reduction = reducer.fit_transform(st.session_state.embeddings)
-    colnames = ['d' + str(i + 1) for i in range(dims)]
-    reduction = pd.DataFrame(reduction, columns=colnames)
-    reduction_name = name_reduction()
-    st.session_state.reduction_dict.update({
-        reduction_name: {
-            'points': reduction,
-            'cluster_ids': None,
-            'cluster_mods': {}
-        }
-    })
-    st.session_state.current_reduction = reduction_name
-    return
-
-
-def name_reduction():
-    """Generates a string name for a particular reduction."""
-    param_dict = {
-        'UMAP': {
-            'name': 'umap',
-            'params': ['n_neighbors', 'min_dist'],
-            'param_abbrevs': ['nn', 'dist']
-        },
-        't-SNE': {
-            'name': 'tsne',
-            'params': ['perplexity', 'learning_rate', 'n_iter'],
-            'param_abbrevs': ['perp', 'lr', 'iter']
-        }
-    }
-    curr_method = st.session_state.reduction_method
-    if curr_method != 'PCA':
-        curr_name = param_dict[curr_method]['name']
-        param_vals = [
-            str(st.session_state[curr_name + '_' + p])
-            for p in param_dict[curr_method]['params']
-        ]
-        param_abbrevs = param_dict[curr_method]['param_abbrevs']
-        param_str = ', '.join([param_abbrevs[i] + '=' + param_vals[i]
-                               for i in range(len(param_vals))])
-        name_str = curr_method + '(' + param_str + ')'
-    else:
-        name_str = 'PCA'
-    return name_str
+    return nn

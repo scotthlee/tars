@@ -13,17 +13,21 @@ from tools import oai, data
 
 
 class TextData:
-    def __init__(self, docs):
+    def __init__(self,
+                 docs=None,
+                 metadata=None,
+                 embeddings=None):
         self.text = docs
-        self.embeddings = None
+        self.metadata = metadata
+        self.embeddings = embeddings
         self.reductions = {}
+        self.last_reduction = None
 
     def embed(self,
-              model_type='openai',
               model_name='ada-002',
               engine='text-embedding-ada-002'):
         """Embeds the object's text."""
-        if model_type == 'openai':
+        if model_name == 'ada-002':
             oai.load_openai_settings(mode='embeddings')
             with st.spinner('Fetching the embeddings...'):
                 response = openai.Embedding.create(
@@ -38,23 +42,58 @@ class TextData:
         self.precomputed_knn = data.compute_nn(self.embeddings)
 
     def reduce(self,
-               method='UMAP',
+               method='PCA',
                dimensions=3,
-               kwargs={}):
+               main_kwargs={},
+               aux_kwargs={}):
+        """Reduces the dimensionality of the text embeddings using one of
+        three methods: PCA, t-SNE, or UMAP. The reduced-dimensionality
+        embeddings are stored as a data.EmbeddingReduction() object stored in
+        the TextData object's reductions dict attribute.
+        """
         reducer = data.EmbeddingReduction(method=method,
                                           dimensions=dimensions)
-        reducer.fit(self.embeddings, kwargs=kwargs)
+        reducer.fit(self.embeddings,
+                    main_kwargs=main_kwargs,
+                    aux_kwargs=aux_kwargs)
         self.reductions.update({reducer.name: reducer})
+        self.last_reduction = reducer.name
         return
 
     def cluster(self,
                 reduction,
                 method,
-                kwargs={}):
+                main_kwargs={},
+                aux_kwargs={}):
         """Runs a clustering algorithm on one of the object's reductions."""
-        self.reductions[reduction].cluster(method=method, kwargs=kwargs)
+        self.reductions[reduction].cluster(method=method,
+                                           main_kwargs=main_kwargs,
+                                           aux_kwargs=aux_kwargs)
         return
 
+    def generate_cluster_keywords(self,
+                      reduction,
+                      model,
+                      docs=None,
+                      method='TF-IDF',
+                      top_k=10,
+                      norm='l1',
+                      main_kwargs={},
+                      aux_kwargs={}):
+        """Names clusters based on the text samples they contain. Uses one of
+        two approaches: cluster TF-IDF (the last step of BERTopic), or direct
+        labeling with ChatGPT.
+        """
+        if docs is None:
+            docs = self.text
+        self.reductions[reduction].generate_cluster_keywords(model=model,
+                                                             method=method,
+                                                             top_k=top_k,
+                                                             norm=norm,
+                                                             docs=docs,
+                                                             main_kwargs=main_kwargs,
+                                                             aux_kwargs=aux_kwargs)
+        return
 
 
 def docs_to_sents():
@@ -68,35 +107,7 @@ def docs_to_sents():
     sents_flat = [s for l in sents for s in l]
     rows = [[i] * len(l) for i, l in enumerate(sents)]
     rows_flat = [r for l in rows for r in l]
-
-    st.session_state.text.update({'sentences': sents})
-    return
-
-
-def fetch_embeddings():
-    """Generates embeddings for the user's text, along with the associated \
-    PCA reduction for initial visualization."""
-    if st.session_state.embedding_type == 'sentences':
-        if st.session_state.text['sentences'] is None:
-            docs_to_sents()
-        text = st.session_state.text['sentences'][0:2000]
-    else:
-        text = st.session_state.text['documents'][0:2000]
-    if st.session_state.embedding_model == 'ada-002':
-        oai.load_openai_settings(mode='embeddings')
-        with st.spinner('Fetching the embeddings...'):
-            response = openai.Embedding.create(
-                input=text,
-                engine=st.session_state.embedding_engine,
-            )
-        embeddings = np.array([response['data'][i]['embedding']
-                  for i in range(len(text))])
-    if st.session_state.embedding_type == 'huggingface':
-        pass
-    st.session_state.embeddings = pd.DataFrame(embeddings)
-    data.compute_nn()
-    data.reduce_dimensions(reduction_method='PCA')
-    return
+    return sents_flat, rows_flat
 
 
 def average_embeddings(embeddings, weights=None, axis=0):
