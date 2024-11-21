@@ -18,9 +18,9 @@ from tools import oai, data, text, strml
 
 
 # Fire up the page
-st.set_page_config(page_title='NLP Tool',
+st.set_page_config(page_title='Embedding Projector',
                 layout='wide',
-                page_icon='📖',
+                page_icon='📽',
                 menu_items={'Report a Bug': 'https://github.com/scotthlee/nlp-tool/issues/new/choose',
                             'About': 'https://github.com/scotthlee/nlp-tool/'})
 
