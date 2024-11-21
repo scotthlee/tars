@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import io
 import streamlit as st
 
 from copy import deepcopy
@@ -14,6 +13,7 @@ from umap import UMAP
 from umap.umap_ import nearest_neighbors
 from matplotlib import pyplot as plt
 from scipy.cluster.hierarchy import dendrogram
+from scipy.stats import rankdata
 
 
 class ClusterModel:
@@ -55,6 +55,9 @@ class ClusterModel:
         kwargs = {**main_kwargs, **aux_kwargs}
         mod = globals()[mod_name](**kwargs)
 
+        # Doing a deep copy so as not to change the input data
+        X = deepcopy(X)
+
         # Fit the underlying model
         with st.spinner('Running the clustering algorithm...'):
             mod.fit(X)
@@ -66,15 +69,35 @@ class ClusterModel:
         self.labels = pd.DataFrame(labels, columns=[id_str])
         self.model = mod
         self.params = kwargs
-        self.counts = pd.crosstab(self.labels[id_str], 'count')
 
-        # Calculate the cluster-based scoring metrics
+        # Calculate cluster size
+        ids = self.labels[id_str].unique()
+        counts = {}
+        for id in ids:
+            id_samp = self.labels[self.labels[id_str] == id]
+            counts.update({id : id_samp.shape[0]})
+        self.counts = counts
+        count_ranks = rankdata(list(counts.values()))
+        self.count_ranks = {id: count_ranks[i] for i, id in enumerate(ids)}
+
+        # Calculate intracluster variances
+        vars = {}
+        for id in ids:
+            id_rows = np.where(self.labels[id_str] == id)[0]
+            id_samp = X.iloc[id_rows, :]
+            vars.update({id: id_samp.var().sum()})
+        self.vars = vars
+        var_ranks = rankdata(list(vars.values()))
+        self.var_ranks = {id: var_ranks[i] for i, id in enumerate(ids)}
+
+        # Calculate the cluster centers and scoring metrics
         self._calculate_centers(X, id_str)
         self._calculate_metrics(X, id_str)
 
         return
 
     def _calculate_centers(self, X, id):
+        """Calculates the mean (i.e., the centroid) for each cluster."""
         if self.labels is not None:
             X[id] = self.labels[id]
             by_cluster = X.groupby(id, as_index=False)
@@ -82,6 +105,7 @@ class ClusterModel:
         return
 
     def _calculate_metrics(self, X, id):
+        """Calculates a few metrics for measuring cluster quality."""
         if self.labels is not None:
             if self.centers is None:
                 self._calculate_centers(X, id)
@@ -95,15 +119,13 @@ class ClusterModel:
         return
 
     def generate_keywords(self,
-                      docs,
-                      method='TF-IDF',
-                      norm='l1',
-                      top_k=10,
-                      main_kwargs={},
-                      aux_kwargs={}):
-        """Names clusters based on the text samples they contain. Uses one of
-        two approaches: cluster TF-IDF (the last step of BERTopic), or direct
-        labeling with ChatGPT."""
+                          docs,
+                          method='TF-IDF',
+                          norm='l1',
+                          top_k=10,
+                          main_kwargs={},
+                          aux_kwargs={}):
+        """Geneates the to keywords for each cluster."""
         # Merge docs with cluster IDs
         lower_name = self.model_choices[self.model_name]['lower_name']
         id_name = lower_name + '_id'
@@ -138,9 +160,34 @@ class ClusterModel:
                     row_terms.append(reverse_vocab.get(k, k))
                 sorted_terms.append(row_terms)
             sorted_terms = np.array(sorted_terms)
-            self.keywords = sorted_terms
 
-        return
+            # Save the keywords as a dict
+            keyword_dict = {}
+            for i, id in enumerate(cluster_ids):
+                keyword_dict.update({id: [w for w in sorted_terms[i]]})
+            self.keywords = keyword_dict
+
+    def sample_points(self, max_count=20, min_count=5):
+        """Randomly samples points from each cluster."""
+        if self.labels is not None:
+            algo = self.model_name
+            lower_name = self.model_choices[algo]['lower_name']
+            id_str = lower_name + '_id'
+            ids = self.labels[id_str].unique()
+            out = {}
+            for id in ids:
+                samp = self.labels[self.labels[id_str] == id]
+                cluster_size = samp.shape[0]
+                if cluster_size > min_count:
+                    n = np.min([max_count, cluster_size])
+                    id_dict = {
+                        id: [i for i in samp.sample(n=n).index.values]
+                    }
+                else:
+                    id_dict = {id: [i for i in samp.index.values]}
+                out.update(id_dict)
+            return out
+
 
 class EmbeddingReduction:
     """A container class for a dimensionally-reduced set of embeddings."""
@@ -229,7 +276,7 @@ class EmbeddingReduction:
                                                      aux_kwargs=aux_kwargs)
 
 
-def make_dendrogram(model, as_bytes=True):
+def make_dendrogram(model):
     """Makes a dendrogram for an agglomerative clustering model."""
     counts = np.zeros(model.children_.shape[0])
     n_samples = len(model.labels_)
@@ -252,9 +299,7 @@ def make_dendrogram(model, as_bytes=True):
     return fig
 
 
-def compute_nn(embeddings,
-               n_neighbors=250,
-               metric='euclidean'):
+def compute_nn(embeddings, n_neighbors=250, metric='euclidean'):
     """Pre-computes the nearest neighbors graph for UMAP."""
     with st.spinner('Calculating nearest neighbors...'):
         nn = nearest_neighbors(embeddings,
