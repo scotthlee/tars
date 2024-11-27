@@ -148,7 +148,7 @@ def fetch_embeddings():
 
 def reduce_dimensions():
     """Reduces the dimensonality of the currently-chosen embeddings."""
-    td = fetch_td(st.session_state.current_text_data)
+    td = fetch_td(st.session_state.embedding_type_select)
     method = st.session_state.reduction_method
     rd = st.session_state.reduction_dict
     method_low = rd[method]['lower_name']
@@ -198,7 +198,7 @@ def generate_cluster_keywords():
     """Generates cluster names as topic lists. Currently only one method,
     cluster-based TF-IDF, from BERTopic, is supported.
     """
-    td = fetch_td(st.session_state.current_text_data)
+    td = fetch_td(st.session_state.embedding_type_select)
     reduction = st.session_state.current_reduction
     model = st.session_state.clustering_algorithm
     td.generate_cluster_keywords(reduction=st.session_state.current_reduction,
@@ -206,6 +206,12 @@ def generate_cluster_keywords():
                                  model=model)
     return
 
+
+def double_space():
+    """Adds a vertical double space to the screen."""
+    st.write('')
+    st.write('')
+    return
 
 @st.dialog('Download Session Data')
 def download_dialog():
@@ -242,4 +248,59 @@ def load_dialog():
                      on_change=load_file,
                      kwargs={'data_type': data_type})
     if st.session_state.source_file is not None:
+        st.rerun()
+
+@st.dialog('Switch Projection')
+def switch_projection():
+    emb_select = st.selectbox(
+        label='Base embeddings',
+        options=list(st.session_state.text_data_dict.keys()),
+        help='Which embeddings would you like to work with?'
+    )
+    td_name = emb_select
+    td = st.session_state.text_data_dict[td_name]
+    reduc_select = st.selectbox('Reduction',
+                                index=None,
+                                options=list(td.reductions.keys()),
+                                placeholder=st.session_state.current_reduction)
+    if st.button('Save and Exit'):
+        st.session_state.hover_data = {
+            k: st.session_state.hover_data[k]
+            for k in list(st.session_state.hover_data.keys())
+            if '_id' not in k
+        }
+        st.session_state.embedding_type_select = emb_select
+        st.session_state.current_reduction = reduc_select
+        st.rerun()
+
+
+@st.dialog('More Options')
+def plot_options():
+    marker_size = st.slider('Marker size',
+              min_value=1,
+              max_value=20,
+              value=st.session_state.marker_size,
+              help='How large you want the points in the scatterplot to \
+              be.')
+    marker_opacity = st.slider('Marker opacity',
+              min_value=0.0,
+              max_value=1.0,
+              step=0.001,
+              value=st.session_state.marker_opacity,
+              help='How opaque you want the points in the scatterplot to \
+              be. 1 is fully opaque, and 0 is fully transparent.')
+    plot_height = st.slider('Plot height',
+              min_value=100,
+              max_value=1200,
+              step=10,
+              value=st.session_state.plot_height,
+              help='How tall you want the scatterplot to be. It will fill \
+              the width of the screen by default, but the height is \
+              adjustable.')
+    if st.button('Save and Exit'):
+        st.session_state.color_column = None
+        st.session_state._color_column = None
+        st.session_state.marker_size = marker_size
+        st.session_state.marker_opactiy = marker_opacity
+        st.session_state.plot_height = plot_height
         st.rerun()

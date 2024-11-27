@@ -350,6 +350,7 @@ else:
     has_aggl = False
 
 with st.sidebar:
+    st.subheader('I/O')
     with st.expander('Load', expanded=not (has_source or has_data)):
         st.radio('What kind of data do you want to load?',
                  options=list(st.session_state.data_type_dict.keys()),
@@ -366,6 +367,46 @@ with st.sidebar:
                          on_change=strml.load_file)
         if has_metadata:
             pass
+    with st.expander('Download', expanded=False):
+        if has_embeddings:
+            st.download_button(label='Embeddings',
+                               data=td.embeddings.to_csv(index=False),
+                               file_name='embeddings.csv',
+                               mime='text/csv',
+                               key='_embed_save',
+                               help='Downloads the raw embeddings.')
+        if has_reduction:
+            cr = st.session_state.current_reduction
+            rd_df = td.reductions[cr].points.to_csv(index=False)
+            st.download_button(label='Data reduction',
+                               data=rd_df,
+                               file_name=cr + '.csv',
+                               mime='text/csv',
+                               key='_reduc_save',
+                               help='Downloads the current set of \
+                               reduced-dimension embeddings, along with any \
+                               cluster IDs that were generated for them.')
+            if has_clusters:
+                keywords = []
+                mods = list(td.reductions[cr].cluster_models.values())
+                for mod in mods:
+                    keywords.append(pd.DataFrame(mod.keywords))
+                keywords = pd.concat(keywords, axis=0).to_csv(index=False)
+                st.download_button(label='Cluster keywords',
+                                   file_name='cluster_keywords.csv',
+                                   data=keywords,
+                                   mime='text/csv',
+                                   key='_label_save')
+            if has_aggl:
+                mod = td.reductions[cr]['cluster_models']['aggl']
+                fig = data.make_dendrogram(mod)
+                buf = io.BytesIO()
+                fig.savefig(buf, format='svg')
+                st.download_button(label='Dendrogram',
+                                   data=buf,
+                                   mime='image/svg',
+                                   file_name='dendrogram.svg',
+                                   help='Downloads the clustering dendrogram.')
     if not st.session_state.premade_loaded:
         with st.expander('Embed', expanded=(not has_embeddings) and
                          (has_data or has_source)):
@@ -401,6 +442,8 @@ with st.sidebar:
                           key='_embed_go',
                           disabled=(not st.session_state.enable_generate_button),
                           on_click=strml.fetch_embeddings)
+    st.divider()
+    st.subheader('Analysis')
     with st.expander('Reduce', expanded=(not has_reduction) and
                      has_embeddings):
         st.selectbox(label='Method',
@@ -647,68 +690,13 @@ with st.sidebar:
                                                        'summary_top_questions',
                                                        'summary_methods_section']}
                 )
-    with st.expander('Download', expanded=False):
-        if has_embeddings:
-            st.download_button(label='Embeddings',
-                               data=td.embeddings.to_csv(index=False),
-                               file_name='embeddings.csv',
-                               mime='text/csv',
-                               key='_embed_save',
-                               help='Downloads the raw embeddings.')
-        if has_reduction:
-            cr = st.session_state.current_reduction
-            rd_df = td.reductions[cr].points.to_csv(index=False)
-            st.download_button(label='Data reduction',
-                               data=rd_df,
-                               file_name=cr + '.csv',
-                               mime='text/csv',
-                               key='_reduc_save',
-                               help='Downloads the current set of \
-                               reduced-dimension embeddings, along with any \
-                               cluster IDs that were generated for them.')
-            if has_clusters:
-                keywords = []
-                mods = list(td.reductions[cr].cluster_models.values())
-                for mod in mods:
-                    keywords.append(pd.DataFrame(mod.keywords))
-                keywords = pd.concat(keywords, axis=0).to_csv(index=False)
-                st.download_button(label='Cluster keywords',
-                                   file_name='cluster_keywords.csv',
-                                   data=keywords,
-                                   mime='text/csv',
-                                   key='_label_save')
-            if has_aggl:
-                mod = td.reductions[cr]['cluster_models']['aggl']
-                fig = data.make_dendrogram(mod)
-                buf = io.BytesIO()
-                fig.savefig(buf, format='svg')
-                st.download_button(label='Dendrogram',
-                                   data=buf,
-                                   mime='image/svg',
-                                   file_name='dendrogram.svg',
-                                   help='Downloads the clustering dendrogram.')
+    st.divider()
+    st.subheader('Options')
+    if has_reduction:
+        if st.button('Switch projection'):
+            strml.switch_projection()
 
 # Making the main visualization
-if has_reduction:
-    cols = st.columns(5)
-    with cols[0]:
-        embedding_select = st.selectbox(
-            label='Base embeddings',
-            options=list(st.session_state.text_data_dict.keys()),
-            key='_embedding_type_select',
-            help='Which embeddings would you like to work with?',
-            on_change=strml.update_settings,
-            kwargs={'keys': ['embedding_type_select']}
-        )
-    with cols[1]:
-        st.selectbox('Reduction',
-                     index=None,
-                     key='_current_reduction',
-                     options=list(td.reductions.keys()),
-                     placeholder=st.session_state.current_reduction,
-                     on_change=strml.switch_reduction,
-                     help='Which dimensionally-reduced version of the \
-                     embeddings would you like to work with?')
 with st.container(border=True):
     if has_reduction:
         # Construct the hover columns
