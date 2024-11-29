@@ -8,6 +8,7 @@ import pandas as pd
 import streamlit as st
 import ast
 import pymupdf
+import openai
 
 from tools.data import compute_nn
 from tools.text import TextData
@@ -126,7 +127,7 @@ def set_text(col):
     docs = [str(d) for d in sf[text_col]]
     text_type = st.session_state.embedding_type
     td = TextData(docs=docs, metadata=sf)
-    st.session_state.current_text_data = text_type
+    st.session_state.embedding_type_select = text_type
     st.session_state.text_data_dict.update({text_type: td})
     st.session_state.hover_columns = [text_col]
     st.session_state.source_file = sf
@@ -207,11 +208,92 @@ def generate_cluster_keywords():
     return
 
 
-def double_space():
-    """Adds a vertical double space to the screen."""
-    st.write('')
-    st.write('')
+def generate_report():
+    """Generates a summary report of the information in the user's documents,
+    organized by cluster.
+    """
+    # Prep the individual cluster samples
+    id_col = st.session_state.summary_cluster_choice.replace('_id', '')
+    cd = st.session_state.cluster_dict
+    algo = [k for k in list(cd.keys()) if cd[k]['lower_name'] == id_col][0]
+    samp_size = int(st.session_state.summary_n_samples)
+    td = fetch_td(st.session_state.embedding_type_select)
+    reduction = st.session_state.current_reduction
+    cm = td.reductions[reduction].cluster_models[algo]
+    docs = td.text
+    doc_samps = cm.sample_docs(docs=docs, max_count=samp_size)
+    cluster_ids = list(doc_samps.keys())
+
+    # Pull the quantitative measures for use later
+    quant_reports = cluster_stats_to_text(cm)
+
+    # Prep the LLM prompt
+    report = ''
+    progress_text = 'Summarizing the clusters with ChatGPT. Please wait...'
+    progress_bar = st.progress(value=0, text=progress_text)
+    for i, id in enumerate(cluster_ids[2:4]):
+        instructions = "I'm working on a qualitative analysis of a public health \
+        dataset. Here's a brief description of the dataset itself: "
+        instructions = '\n\n' + st.session_state.summary_description + '\n\n'
+        instructions += "And for context, here's a sample of documents from the \
+        dataset:\n\n"
+        for doc in doc_samps[id]:
+            instructions += doc + '\n'
+        instructions += "\nBased on these samples, what one word or phrase would \
+        you use to describe the information in the documents? Also, could you \
+        a brief summary of the samples that would help someone answer the \
+        following questions:\n\n"
+        instructions += st.session_state.summary_top_questions
+        instructions += "\n\nYou don't necessarily have to answer the questions \
+        themselves, but please at least provide some analysis that would be \
+        helpful in answering them."
+
+        # Generate the report
+        message = [
+            {
+                "role": "system",
+                "content": "You are a health communications specialist with \
+                expertise in qualitative analysis."
+            },
+            {
+                "role": "user",
+                "content": instructions
+            },
+        ]
+        completion = openai.ChatCompletion.create(
+            engine=st.session_state.engine,
+            messages=message,
+            temperature=st.session_state.temperature,
+            max_tokens=st.session_state.max_tokens,
+            top_p=st.session_state.top_p,
+            frequency_penalty=st.session_state.frequency_penalty,
+            presence_penalty=st.session_state.presence_penalty,
+            stop=None
+        )
+        res = completion['choices'][0]['message']['content']
+        res += '\n\n'
+
+        # Add the cluster-specific metrics to the top
+        res = quant_reports[id] + '\n' + res
+        report += res
+        progress_bar.progress(i + 1)
+    st.session_state.summary_report = report
     return
+
+
+def cluster_stats_to_text(cm):
+    counts = cm.counts
+    ids = list(counts.keys())
+    out = {}
+    for id in ids:
+        id_text = "Cluster size: " + str(cm.counts[id]) + '\n'
+        id_text += "Size rank: " + str(cm.count_ranks[id])
+        id_text  += ' of ' + str(len(ids)) + '\n'
+        id_text += "Cluster variance: " + str(cm.vars[id]) + '\n'
+        id_text += "Variance rank: " + str(cm.var_ranks[id])
+        id_text += ' of ' + str(len(ids))
+        out.update({id: id_text})
+    return out
 
 @st.dialog('Download Session Data')
 def download_dialog():
@@ -232,23 +314,6 @@ def download_dialog():
         st.form_submit_button('Save')
     st.download_button('Test')
 
-
-@st.dialog('Load Data')
-def load_dialog():
-    """Creates a modal dialog for uploading the initial data."""
-    data_type = st.radio('What kind of data do you want to load?',
-                         options=list(st.session_state.data_type_dict.keys()),
-                          help="The kind of data you want to load. If you don't have \
-                          embeddings made yet, choose tabular data or bulk documents, \
-                          depending on how your text is saved, to get started.")
-    st.file_uploader(label='Select the file(s)',
-                     type=st.session_state.data_type_dict[st.session_state.data_type],
-                     key='_source_file',
-                     accept_multiple_files=st.session_state.data_type == 'Bulk documents',
-                     on_change=load_file,
-                     kwargs={'data_type': data_type})
-    if st.session_state.source_file is not None:
-        st.rerun()
 
 @st.dialog('Switch Projection')
 def switch_projection():
@@ -271,36 +336,4 @@ def switch_projection():
         }
         st.session_state.embedding_type_select = emb_select
         st.session_state.current_reduction = reduc_select
-        st.rerun()
-
-
-@st.dialog('More Options')
-def plot_options():
-    marker_size = st.slider('Marker size',
-              min_value=1,
-              max_value=20,
-              value=st.session_state.marker_size,
-              help='How large you want the points in the scatterplot to \
-              be.')
-    marker_opacity = st.slider('Marker opacity',
-              min_value=0.0,
-              max_value=1.0,
-              step=0.001,
-              value=st.session_state.marker_opacity,
-              help='How opaque you want the points in the scatterplot to \
-              be. 1 is fully opaque, and 0 is fully transparent.')
-    plot_height = st.slider('Plot height',
-              min_value=100,
-              max_value=1200,
-              step=10,
-              value=st.session_state.plot_height,
-              help='How tall you want the scatterplot to be. It will fill \
-              the width of the screen by default, but the height is \
-              adjustable.')
-    if st.button('Save and Exit'):
-        st.session_state.color_column = None
-        st.session_state._color_column = None
-        st.session_state.marker_size = marker_size
-        st.session_state.marker_opactiy = marker_opacity
-        st.session_state.plot_height = plot_height
         st.rerun()

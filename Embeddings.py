@@ -313,8 +313,12 @@ if 'summary_top_questions' not in st.session_state:
     st.session_state.summary_top_questions = 'Question 1\nQuestion 2\n...'
 if 'summary_cluster_choice' not in st.session_state:
     st.session_state.cluster_choice = None
+if 'summary_n_samles' not in st.session_state:
+    st.session_state.summary_n_samples = 10
 if 'summary_methods_section' not in st.session_state:
     st.session_state.summary_methods_section = False
+if 'summary_report' not in st.session_state:
+    st.session_state.summary_report = None
 
 # Loading the handful of variables that don't persist across pages
 to_load = ['text_column', 'data_type']
@@ -326,6 +330,7 @@ for key in to_load:
 td_name = st.session_state.embedding_type_select
 has_data = td_name is not None
 has_source = st.session_state.source_file is not None
+has_report = st.session_state.summary_report is not None
 tabular_source = st.session_state.data_type == 'Tabular data with text column'
 
 # Some bools for controlling menu expansion and container rendering
@@ -407,6 +412,13 @@ with st.sidebar:
                                    mime='image/svg',
                                    file_name='dendrogram.svg',
                                    help='Downloads the clustering dendrogram.')
+            if has_report:
+                st.download_button(label='Summary Report',
+                                   file_name='summary_report.txt',
+                                   data=st.session_state.summary_report,
+                                   mime='text/txt')
+    st.divider()
+    st.subheader('Analysis')
     if not st.session_state.premade_loaded:
         with st.expander('Embed', expanded=(not has_embeddings) and
                          (has_data or has_source)):
@@ -442,9 +454,7 @@ with st.sidebar:
                           key='_embed_go',
                           disabled=(not st.session_state.enable_generate_button),
                           on_click=strml.fetch_embeddings)
-    st.divider()
-    st.subheader('Analysis')
-    with st.expander('Reduce', expanded=(not has_reduction) and
+    with st.expander('Shrink', expanded=(not has_reduction) and
                      has_embeddings):
         st.selectbox(label='Method',
                      options=['UMAP', 't-SNE', 'PCA'],
@@ -533,12 +543,20 @@ with st.sidebar:
                                 min_value=2,
                                 max_value=1000,
                                 key='_hdbscan_min_cluster_size',
-                                value=st.session_state.hdbscan_min_cluster_size)
+                                value=st.session_state.hdbscan_min_cluster_size,
+                                help='The minimum number of samples in a group \
+                                for the group to be considered a cluster. \
+                                Groupings smaller than this size will be left \
+                                as noise.')
                 st.number_input('Minimum samples',
                                 min_value=1,
                                 max_value=1000,
                                 key='_hdbscan_min_samples',
-                                value=st.session_state.hdbscan_min_samples)
+                                value=st.session_state.hdbscan_min_samples,
+                                help='The parameter k used to calculate the \
+                                distance between a point x_p and its k-th \
+                                nearest neighbor. When None, defaults to \
+                                the minimum cluster size.')
             elif current_algorithm == 'k-means':
                 st.number_input('Number of clusters',
                           min_value=1,
@@ -675,6 +693,16 @@ with st.sidebar:
                     its own, and the then those summaries will be used to \
                     produce a top-level summary for the whole datset."
                 )
+                n_samples = st.number_input(
+                    label='Number of samples',
+                    min_value=1,
+                    max_value=50,
+                    value=st.session_state.summary_n_samples,
+                    key='_summary_n_samples',
+                    help="How many samples from each cluster you'd like to send \
+                    to ChatGPT for it to use as a reference when summarizing \
+                    the information is in the cluster."
+                )
                 methods_toggle = st.toggle(
                     label='Include methods section',
                     key='_summary_methods_section',
@@ -684,12 +712,14 @@ with st.sidebar:
                     dimensionality-reduction algorithm, and clustering \
                     algorithm."
                 )
-                st.form_submit_button('Generate report',
-                                      on_click=strml.update_settings,
-                                      kwargs={'keys': ['summary_description',
-                                                       'summary_top_questions',
-                                                       'summary_methods_section']}
-                )
+                if st.form_submit_button('Generate report'):
+                    strml.update_settings(keys=['summary_description',
+                                                'summary_top_questions',
+                                                'summary_n_samples',
+                                                'summary_cluster_choice',
+                                                'summary_methods_section'],
+                                          toast=False)
+                    strml.generate_report()
     st.divider()
     st.subheader('Options')
     if has_reduction:
