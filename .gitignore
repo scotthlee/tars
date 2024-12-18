@@ -14,4 +14,4 @@ venv.bak/
 
 # Other
 .DS_Store
-.csv
+*.csv
