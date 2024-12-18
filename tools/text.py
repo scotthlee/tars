@@ -17,7 +17,7 @@ class TextData:
                  docs=None,
                  metadata=None,
                  embeddings=None):
-        self.text = docs
+        self.docs = docs
         self.metadata = metadata
         self.embeddings = embeddings
         self.reductions = {}
@@ -31,11 +31,11 @@ class TextData:
             oai.load_openai_settings(mode='embeddings')
             with st.spinner('Fetching the embeddings...'):
                 response = openai.Embedding.create(
-                    input=self.text,
+                    input=self.docs,
                     engine=engine,
                 )
             embeddings = np.array([response['data'][i]['embedding']
-                      for i in range(len(self.text))])
+                      for i in range(len(self.docs))])
         elif model_type == 'huggingface':
             pass
         self.embeddings = pd.DataFrame(embeddings)
@@ -85,7 +85,7 @@ class TextData:
         labeling with ChatGPT.
         """
         if docs is None:
-            docs = self.text
+            docs = self.docs
         self.reductions[reduction].generate_cluster_keywords(model=model,
                                                              method=method,
                                                              top_k=top_k,

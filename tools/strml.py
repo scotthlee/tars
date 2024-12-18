@@ -106,6 +106,7 @@ def load_file():
                 metadata = pd.read_csv(sf, encoding='latin')
             td = fetch_td(st.session_state.embedding_type_select)
             td.metadata = metadata
+            st.session_state.source_file = metadata
             st.session_state.text_data_dict.update({'documents': td})
     return
 
@@ -121,14 +122,25 @@ def set_text(col):
     """Adds the text to be embedded to the session state. Only applies when
     tabular data is used for the input.
     """
+    # Pull the text from the metadata file and prep
     text_col = st.session_state['_' + col]
     sf = st.session_state.source_file.dropna(axis=0, subset=text_col)
     sf[text_col] = sf[text_col].astype(str)
     docs = [str(d) for d in sf[text_col]]
-    text_type = st.session_state.embedding_type
-    td = TextData(docs=docs, metadata=sf)
-    st.session_state.embedding_type_select = text_type
+
+    # Create a new TextData object with the text as its docs
+    data_type = st.session_state.data_type
+    if data_type == 'Tabular data with text column':
+        text_type = st.session_state.embedding_type
+        td = TextData(docs=docs, metadata=sf)
+        st.session_state.embedding_type_select = text_type
+    elif data_type == 'Metadata':
+        text_type = 'documents'
+        td = fetch_td('documents')
+        td.docs = docs
     st.session_state.text_data_dict.update({text_type: td})
+
+    # Set some other session state variables
     st.session_state.hover_columns = [text_col]
     st.session_state.source_file = sf
     st.session_state.enable_generate_button = True
@@ -182,6 +194,11 @@ def run_clustering():
                method=algo,
                main_kwargs=main_kwargs,
                aux_kwargs=aux_kwargs)
+    if td.docs is not None:
+        td.generate_cluster_keywords(
+            reduction=st.session_state.current_reduction,
+            model=algo
+        )
     return
 
 
@@ -244,16 +261,15 @@ def generate_report():
         a brief summary of the samples that would help someone answer the \
         following questions:\n\n"
         instructions += st.session_state.summary_top_questions
-        instructions += "\n\nYou don't necessarily have to answer the questions \
-        themselves, but please at least provide some analysis that would be \
-        helpful in answering them."
+        instructions += "\n\nPlease format your answers using the following \
+        template: \n\n??Keywords: [KEYWORDS/PHRASES GO HERE]\n\nSummary: \
+        [BRIEF SUMMARY GOES HERE]??."
 
         # Generate the report
         message = [
             {
                 "role": "system",
-                "content": "You are a health communications specialist with \
-                expertise in qualitative analysis."
+                "content": st.session_state.gpt_persona
             },
             {
                 "role": "user",
@@ -278,10 +294,12 @@ def generate_report():
         report += res
         progress_bar.progress(i + 1)
     st.session_state.summary_report = report
+    st.toast('Report generation finished!')
     return
 
 
 def cluster_stats_to_text(cm):
+    """Writes a short text report with quantitative clustering metrics."""
     counts = cm.counts
     ids = list(counts.keys())
     out = {}
@@ -294,6 +312,7 @@ def cluster_stats_to_text(cm):
         id_text += ' of ' + str(len(ids))
         out.update({id: id_text})
     return out
+
 
 @st.dialog('Download Session Data')
 def download_dialog():

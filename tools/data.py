@@ -268,6 +268,7 @@ class EmbeddingReduction:
 
     def generate_cluster_keywords(self,
                                   docs,
+                                  model,
                                   method='TF-IDF',
                                   top_k=10,
                                   norm='l1',

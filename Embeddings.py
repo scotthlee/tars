@@ -99,6 +99,9 @@ if 'chat_engine' not in st.session_state:
     st.session_state.engine = openai_defaults['chat']['engine']
 if 'chat_engine_choices' not in st.session_state:
     st.session_state.engine_choices = list(openai_dict['chat'].keys())
+if 'gpt_persona' not in st.session_state:
+    st.session_state.gpt_persona = "You are a health communications specialist \
+    with expertise in qualitative analysis."
 
 if 'embedding_engine' not in st.session_state:
     st.session_state.embedding_engine = openai_defaults['embeddings']['engine']
@@ -150,7 +153,6 @@ if 'data_type' not in st.session_state:
 if 'data_type_dict' not in st.session_state:
     st.session_state.data_type_dict = {
         'Tabular data with text column': ['csv'],
-        'Bulk documents': ['pdf', 'txt'],
         'Premade embeddings': ['csv', 'tsv']
     }
 
@@ -357,21 +359,33 @@ else:
 with st.sidebar:
     st.subheader('I/O')
     with st.expander('Load', expanded=not (has_source or has_data)):
-        st.radio('What kind of data do you want to load?',
-                 options=list(st.session_state.data_type_dict.keys()),
-                 key='_data_type',
-                 on_change=strml.update_settings,
-                 kwargs={'keys': ['data_type']},
-                 help="The kind of data you want to load. If you don't have \
-                 embeddings made yet, choose tabular data or bulk documents, \
-                 depending on how your text is saved, to get started.")
-        st.file_uploader(label='Select the file(s)',
-                         type=st.session_state.data_type_dict[st.session_state.data_type],
-                         key='_source_file',
-                         accept_multiple_files=st.session_state.data_type == 'Bulk documents',
-                         on_change=strml.load_file)
-        if has_metadata:
-            pass
+        st.radio(
+            'What kind of data do you want to load?',
+            options=list(st.session_state.data_type_dict.keys()),
+            key='_data_type',
+            on_change=strml.update_settings,
+            kwargs={'keys': ['data_type']},
+            help="The kind of data you want to load. If you don't have \
+            embeddings made yet, choose tabular data to get started."
+        )
+        st.file_uploader(
+            label='Select the file(s)',
+            type=st.session_state.data_type_dict[st.session_state.data_type],
+            key='_source_file',
+            accept_multiple_files=False,
+            on_change=strml.load_file
+        )
+        if has_source:
+            st.selectbox(
+                'Text Column',
+                key='_text_column',
+                index=st.session_state.text_column,
+                options=st.session_state.source_file.columns.values,
+                on_change=strml.set_text,
+                kwargs={'col': 'text_column'},
+                help="Choose the column in your dataset holding the \
+                text you'd like to embed."
+            )
     with st.expander('Download', expanded=False):
         if has_embeddings:
             st.download_button(label='Embeddings',
@@ -422,15 +436,6 @@ with st.sidebar:
     if not st.session_state.premade_loaded:
         with st.expander('Embed', expanded=(not has_embeddings) and
                          (has_data or has_source)):
-                if tabular_source and has_source:
-                    st.selectbox('Text Column',
-                                 key='_text_column',
-                                 index=st.session_state.text_column,
-                                 options=st.session_state.source_file.columns.values,
-                                 on_change=strml.set_text,
-                                 kwargs={'col': 'text_column'},
-                                 help="Choose the column in your dataset holding the \
-                                 text you'd like to embed.")
                 st.selectbox(
                     label='Type',
                     key='_embedding_type',
