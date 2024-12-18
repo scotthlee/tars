@@ -262,8 +262,8 @@ def generate_report():
         following questions:\n\n"
         instructions += st.session_state.summary_top_questions
         instructions += "\n\nPlease format your answers using the following \
-        template: \n\n??Keywords: [KEYWORDS/PHRASES GO HERE]\n\nSummary: \
-        [BRIEF SUMMARY GOES HERE]??."
+        template: \n\n??**Keywords**: [KEYWORDS/PHRASES GO HERE]\n\n \
+        **Summary**: [BRIEF SUMMARY GOES HERE]??."
 
         # Generate the report
         message = [
@@ -288,6 +288,11 @@ def generate_report():
         )
         res = completion['choices'][0]['message']['content']
         res += '\n\n'
+
+        # Add the sample docs for reference
+        res += '**Samples**: \n'
+        for doc in doc_samps[id]:
+            res += str(doc) + '\n'
 
         # Add the cluster-specific metrics to the top
         res = quant_reports[id] + '\n' + res

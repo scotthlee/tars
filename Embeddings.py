@@ -388,49 +388,59 @@ with st.sidebar:
             )
     with st.expander('Download', expanded=False):
         if has_embeddings:
-            st.download_button(label='Embeddings',
-                               data=td.embeddings.to_csv(index=False),
-                               file_name='embeddings.csv',
-                               mime='text/csv',
-                               key='_embed_save',
-                               help='Downloads the raw embeddings.')
+            st.download_button(
+                label='Embeddings',
+                data=td.embeddings.to_csv(index=False),
+                file_name='embeddings.csv',
+                mime='text/csv',
+                key='_embed_save',
+                help='Downloads the raw embeddings.'
+            )
         if has_reduction:
             cr = st.session_state.current_reduction
             rd_df = td.reductions[cr].points.to_csv(index=False)
-            st.download_button(label='Data reduction',
-                               data=rd_df,
-                               file_name=cr + '.csv',
-                               mime='text/csv',
-                               key='_reduc_save',
-                               help='Downloads the current set of \
-                               reduced-dimension embeddings, along with any \
-                               cluster IDs that were generated for them.')
+            st.download_button(
+                label='Data reduction',
+                data=rd_df,
+                file_name=cr + '.csv',
+                mime='text/csv',
+                key='_reduc_save',
+                help='Downloads the current set of reduced-dimension \
+                embeddings, along with any cluster IDs that were generated \
+                for them.'
+            )
             if has_clusters:
                 keywords = []
                 mods = list(td.reductions[cr].cluster_models.values())
                 for mod in mods:
                     keywords.append(pd.DataFrame(mod.keywords))
                 keywords = pd.concat(keywords, axis=0).to_csv(index=False)
-                st.download_button(label='Cluster keywords',
-                                   file_name='cluster_keywords.csv',
-                                   data=keywords,
-                                   mime='text/csv',
-                                   key='_label_save')
+                st.download_button(
+                    label='Cluster keywords',
+                    file_name='cluster_keywords.csv',
+                    data=keywords,
+                    mime='text/csv',
+                    key='_label_save'
+                )
             if has_aggl:
                 mod = td.reductions[cr]['cluster_models']['aggl']
                 fig = data.make_dendrogram(mod)
                 buf = io.BytesIO()
                 fig.savefig(buf, format='svg')
-                st.download_button(label='Dendrogram',
-                                   data=buf,
-                                   mime='image/svg',
-                                   file_name='dendrogram.svg',
-                                   help='Downloads the clustering dendrogram.')
+                st.download_button(
+                    label='Dendrogram',
+                    data=buf,
+                    mime='image/svg',
+                    file_name='dendrogram.svg',
+                    help='Downloads the clustering dendrogram.'
+                )
             if has_report:
-                st.download_button(label='Summary Report',
-                                   file_name='summary_report.txt',
-                                   data=st.session_state.summary_report,
-                                   mime='text/txt')
+                st.download_button(
+                    label='Summary Report',
+                    file_name='summary_report.txt',
+                    data=st.session_state.summary_report,
+                    mime='text/txt'
+                )
     st.divider()
     st.subheader('Analysis')
     if not st.session_state.premade_loaded:
@@ -455,136 +465,167 @@ with st.sidebar:
                     help='The model that will generate the embeddings. For more info \
                     about the different models, see the README.'
                 )
-                st.button(label='Generate embeddings',
-                          key='_embed_go',
-                          disabled=(not st.session_state.enable_generate_button),
-                          on_click=strml.fetch_embeddings)
+                st.button(
+                    label='Generate embeddings',
+                    key='_embed_go',
+                    disabled=(not st.session_state.enable_generate_button),
+                    on_click=strml.fetch_embeddings
+                )
     with st.expander('Shrink', expanded=(not has_reduction) and
                      has_embeddings):
-        st.selectbox(label='Method',
-                     options=['UMAP', 't-SNE', 'PCA'],
-                     index=None,
-                     key='_reduction_method',
-                     placeholder=st.session_state.reduction_method,
-                     on_change=strml.update_settings,
-                     kwargs={'keys': ['reduction_method']},
-                     help='The algorithm used to reduce the dimensionality \
-                     of the embeddings to make them viewable in 2- or 3-D.')
+        st.selectbox(
+            label='Method',
+            options=['UMAP', 't-SNE', 'PCA'],
+            index=None,
+            key='_reduction_method',
+            placeholder=st.session_state.reduction_method,
+            on_change=strml.update_settings,
+            kwargs={'keys': ['reduction_method']},
+            help='The algorithm used to reduce the dimensionality \
+            of the embeddings to make them viewable in 2- or 3-D.'
+        )
         with st.form('_reduce_param_form', border=False):
             if st.session_state.reduction_method == 'UMAP':
-                st.slider('Nearest neighbors',
-                          min_value=2,
-                          max_value=200,
-                          key='_umap_n_neighbors',
-                          value=st.session_state.umap_n_neighbors,
-                          help='This parameter controls how UMAP balances \
-                          local versus global structure. Low values will force \
-                          UMAP to concentrate on very local structure, while \
-                          large values will push UMAP to look at larger \
-                          neighborhoods of each point when estimating \
-                          the mainfold structure of the data.')
-                st.slider('Minimum distance',
-                          min_value=0.0,
-                          max_value=1.0,
-                          step=0.001,
-                          value=st.session_state.umap_min_dist,
-                          key='_umap_min_dist',
-                          help='Controls how tightly UMAP is allowed to pack \
-                          points together.')
+                st.slider(
+                    label='Nearest neighbors',
+                    min_value=2,
+                    max_value=200,
+                    key='_umap_n_neighbors',
+                    value=st.session_state.umap_n_neighbors,
+                    help='This parameter controls how UMAP balances \
+                    local versus global structure. Low values will force \
+                    UMAP to concentrate on very local structure, while \
+                    large values will push UMAP to look at larger \
+                    neighborhoods of each point when estimating \
+                    the mainfold structure of the data.'
+                )
+                st.slider(
+                    label='Minimum distance',
+                    min_value=0.0,
+                    max_value=1.0,
+                    step=0.001,
+                    value=st.session_state.umap_min_dist,
+                    key='_umap_min_dist',
+                    help='Controls how tightly UMAP is allowed to pack \
+                          points together.'
+                )
             if st.session_state.reduction_method == 't-SNE':
-                st.slider('Perplexity',
-                          min_value=5.0,
-                          max_value=50.0,
-                          value=st.session_state.tsne_perplexity,
-                          key='_tsne_perplexity')
-                st.slider('Learning rate',
-                          min_value=100.00,
-                          max_value=1000.00,
-                          value=st.session_state.tsne_learning_rate,
-                          key='_tsne_learning_rate')
-                st.slider('Number of iterations',
-                          min_value=200,
-                          max_value=10000,
-                          value=st.session_state.tsne_n_iter,
-                          key='_tsne_n_iter')
-            st.toggle(label='3D',
-                      key='_reduce_to_3d',
-                      value=st.session_state.reduce_to_3d,
-                      help='Whether to reduce the embeddings to 3 dimensions \
-                      (instead of 2).')
-            st.form_submit_button('Start Reduction',
-                      on_click=strml.reduce_dimensions)
+                st.slider(
+                    label='Perplexity',
+                    min_value=5.0,
+                    max_value=50.0,
+                    value=st.session_state.tsne_perplexity,
+                    key='_tsne_perplexity'
+                )
+                st.slider(
+                    label='Learning rate',
+                    min_value=100.00,
+                    max_value=1000.00,
+                    value=st.session_state.tsne_learning_rate,
+                    key='_tsne_learning_rate'
+                )
+                st.slider(
+                    label='Number of iterations',
+                    max_value=10000,
+                    value=st.session_state.tsne_n_iter,
+                    key='_tsne_n_iter'
+                )
+            st.toggle(
+                label='3D',
+                key='_reduce_to_3d',
+                value=st.session_state.reduce_to_3d,
+                help='Whether to reduce the embeddings to 3 dimensions \
+                (instead of 2).'
+            )
+            st.form_submit_button(
+                label='Start Reduction',
+                on_click=strml.reduce_dimensions,
+                disabled=not has_embeddings,
+            )
     with st.expander('Cluster', expanded=has_reduction):
-        st.selectbox('Algorithm',
-                     options=list(cluster_dict.keys()),
-                     key='_clustering_algorithm',
-                     index=None,
-                     placeholder=st.session_state.clustering_algorithm,
-                     on_change=strml.update_settings,
-                     kwargs={'keys': ['clustering_algorithm']},
-                     help='The algorithm to use for grouping the embeddings \
-                     into clusters.')
+        st.selectbox(
+            label='Algorithm',
+            options=list(cluster_dict.keys()),
+            key='_clustering_algorithm',
+            index=None,
+            placeholder=st.session_state.clustering_algorithm,
+            on_change=strml.update_settings,
+            kwargs={'keys': ['clustering_algorithm']},
+            help='The algorithm to use for grouping the embeddings \
+            into clusters.'
+        )
         current_algorithm = st.session_state.clustering_algorithm
         with st.form(key='_cluster_param_form', border=False):
             if current_algorithm == 'DBSCAN':
-                st.number_input('Epsilon',
-                          min_value=0.001,
-                          max_value=10.0,
-                          value=st.session_state.dbscan_eps,
-                          key='_dbscan_eps',
-                          help='The maximum distance between two samples for one \
-                          to be considered as in the neighborhood of the other.')
-                st.number_input('Minimum samples',
-                          min_value=1,
-                          max_value=100,
-                          value=st.session_state.dbscan_min_samples,
-                          key='_dbscan_min_samples',
-                          help='The number of samples in a neighborhood for a \
-                          point to be considered as a core point. At higher \
-                          values, the algorithm will find denser clusters, and \
-                          at lower values, the clusters will be more sparser.')
+                st.number_input(
+                    label='Epsilon',
+                    min_value=0.001,
+                    max_value=10.0,
+                    value=st.session_state.dbscan_eps,
+                    key='_dbscan_eps',
+                    help='The maximum distance between two samples for one \
+                    to be considered as in the neighborhood of the other.'
+                )
+                st.number_input(
+                    label='Minimum samples',
+                    min_value=1,
+                    max_value=100,
+                    value=st.session_state.dbscan_min_samples,
+                    key='_dbscan_min_samples',
+                    help='The number of samples in a neighborhood for a \
+                    point to be considered as a core point. At higher \
+                    values, the algorithm will find denser clusters, and \
+                    at lower values, the clusters will be more sparser.'
+                )
             elif current_algorithm == 'HDBSCAN':
-                st.number_input('Minimum cluster size',
-                                min_value=2,
-                                max_value=1000,
-                                key='_hdbscan_min_cluster_size',
-                                value=st.session_state.hdbscan_min_cluster_size,
-                                help='The minimum number of samples in a group \
-                                for the group to be considered a cluster. \
-                                Groupings smaller than this size will be left \
-                                as noise.')
-                st.number_input('Minimum samples',
-                                min_value=1,
-                                max_value=1000,
-                                key='_hdbscan_min_samples',
-                                value=st.session_state.hdbscan_min_samples,
-                                help='The parameter k used to calculate the \
-                                distance between a point x_p and its k-th \
-                                nearest neighbor. When None, defaults to \
-                                the minimum cluster size.')
+                st.number_input(
+                    label='Minimum cluster size',
+                    min_value=2,
+                    max_value=1000,
+                    key='_hdbscan_min_cluster_size',
+                    value=st.session_state.hdbscan_min_cluster_size,
+                    help='The minimum number of samples in a group for the \
+                    group to be considered a cluster. Groupings smaller than \
+                    this size will be left as noise.'
+                )
+                st.number_input(
+                    label='Minimum samples',
+                    min_value=1,
+                    max_value=1000,
+                    key='_hdbscan_min_samples',
+                    value=st.session_state.hdbscan_min_samples,
+                    help='The parameter k used to calculate the distance \
+                    between a point x_p and its k-th nearest neighbor. When \
+                    None, defaults to the minimum cluster size.'
+                )
             elif current_algorithm == 'k-means':
-                st.number_input('Number of clusters',
-                          min_value=1,
-                          max_value=100,
-                          key='_kmeans_n_clusters',
-                          value=st.session_state.kmeans_n_clusters,
-                          help='The number of clusters to form, as well as the \
-                          number of centroids to generate.')
-                st.number_input('Max iterations',
-                          min_value=1,
-                          max_value=500,
-                          key='_kmeans_max_iter',
-                          value=st.session_state.kmeans_max_iter,
-                          help='The maximum number of iterations for the algorithm \
-                          to run.')
+                st.number_input(
+                    label='Number of clusters',
+                    min_value=1,
+                    max_value=100,
+                    key='_kmeans_n_clusters',
+                    value=st.session_state.kmeans_n_clusters,
+                    help='The number of clusters to form, as well as the number\
+                    of centroids to generate.'
+                )
+                st.number_input(
+                    label='Max iterations',
+                    min_value=1,
+                    max_value=500,
+                    key='_kmeans_max_iter',
+                    value=st.session_state.kmeans_max_iter,
+                    help='The maximum number of iterations for the algorithm \
+                    to run.'
+                )
             elif current_algorithm == 'Agglomerative':
-                st.selectbox('Metric',
-                             options=['euclidean', 'l1', 'l2',
-                                      'manhattan', 'cosine'],
-                             key='_aggl_metric',
-                             index=None,
-                             placeholder=st.session_state.aggl_metric,
-                             kwargs={'keys': ['aggl_metric']})
+                st.selectbox(
+                    label='Metric',
+                    options=['euclidean', 'l1', 'l2', 'manhattan', 'cosine'],
+                    key='_aggl_metric',
+                    index=None,
+                    placeholder=st.session_state.aggl_metric,
+                    kwargs={'keys': ['aggl_metric']}
+                )
             st.text_input('Keyword arguments',
                           key='_cluster_kwargs',
                           value=st.session_state.cluster_kwargs,
