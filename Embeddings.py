@@ -388,7 +388,7 @@ with st.sidebar:
             accept_multiple_files=False,
             on_change=strml.load_file
         )
-        if has_source and has_embeddings:
+        if has_source and (not tabular_source):
             st.selectbox(
                 'Text Column',
                 key='_text_column',
@@ -450,16 +450,16 @@ with st.sidebar:
             if has_report:
                 st.download_button(
                     label='Summary Report',
-                    file_name='summary_report.txt',
+                    file_name='summary_report.html',
                     data=st.session_state.summary_report,
-                    mime='text/txt'
+                    mime='text/html'
                 )
     st.divider()
     st.subheader('Analysis')
     if not st.session_state.premade_loaded:
         with st.expander('Embed', expanded=(not has_embeddings) and
                          (has_data or has_source)):
-                if (not has_embeddings) and (has_source):
+                if tabular_source and has_source:
                     st.selectbox(
                         'Text Column',
                         key='_text_column',
@@ -796,18 +796,23 @@ with st.sidebar:
                     label='Include methods section',
                     key='_summary_methods_section',
                     value=st.session_state.summary_methods_section,
+                    disabled=True,
                     help="Whether to include a methods section in the summary \
                     report with information about your chosen embedding model, \
                     dimensionality-reduction algorithm, and clustering \
                     algorithm."
                 )
                 if st.form_submit_button('Generate report'):
-                    strml.update_settings(keys=['summary_description',
-                                                'summary_top_questions',
-                                                'summary_n_samples',
-                                                'summary_cluster_choice',
-                                                'summary_methods_section'],
-                                          toast=False)
+                    strml.update_settings(
+                        keys=[
+                            'summary_description',
+                            'summary_top_questions',
+                            'summary_n_samples',
+                            'summary_cluster_choice',
+                            'summary_methods_section'
+                        ],
+                        toast=False
+                    )
                     strml.generate_report()
     st.divider()
     st.subheader('Options')

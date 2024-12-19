@@ -9,6 +9,7 @@ import streamlit as st
 import ast
 import pymupdf
 import openai
+import markdown
 
 from tools.data import compute_nn
 from tools.text import TextData
@@ -265,8 +266,8 @@ def generate_report():
             following questions:\n\n"
             instructions += st.session_state.summary_top_questions
             instructions += "\n\nPlease format your answers using the following \
-            template: \n\n??###Keywords: [KEYWORDS/PHRASES GO HERE]\n\n \
-            ###Summary: [BRIEF SUMMARY GOES HERE]??."
+            template: \n\n###Keywords\n[KEYWORDS/PHRASES GO HERE]\n\n \
+            ###Summary\n[BRIEF SUMMARY GOES HERE]."
 
             # Generate the report
             message = [
@@ -293,7 +294,7 @@ def generate_report():
             res += '\n\n'
 
             # Add the sample docs for reference
-            res += '###Samples: \n'
+            res += '###Samples\n'
             for doc in doc_samps[id]:
                 res += str(doc) + '\n'
 
@@ -301,7 +302,7 @@ def generate_report():
             completions += res
 
             # Add the cluster-specific metrics to the top
-            cl_report = quant_reports[id] + '\n' + res
+            cl_report = quant_reports[id] + '\n\n' + res
             cl_report = '##Cluster ID: ' + str(id) + '\n' + cl_report + '\n\n'
             report += cl_report
 
@@ -339,10 +340,14 @@ def generate_report():
         )
         res = completion['choices'][0]['message']['content']
         res = "#Overall Summary\n\n" + res + "\n\n\n"
-        res += "#Cluster-Specific Summaries"
+        res += "#Cluster-Specific Summaries\n\n"
 
         # Save the report to the session state
-        st.session_state.summary_report = res + report
+        st.session_state.summary_report = markdown.markdown(
+            text=res + report,
+            output_format='html',
+            extensions=['nl2br']
+        )
 
     st.toast(
         body='Report generation finished! Head to "Download" in the I/O \
@@ -376,26 +381,6 @@ def reset_defaults(dict, main_key):
         sess_var = lower_name + '_' + k
         st.session_state[sess_var] = v
     return
-
-
-@st.dialog('Download Session Data')
-def download_dialog():
-    """Creates a modal dialog for downloading session data."""
-    tdd = st.session_state.text_data_dict
-    emb_types = list(tdd.keys())
-    dl_select = st.form('dl_select_form')
-    with dl_select:
-        if len(emb_types) > 1:
-            st.write('Which embeddings are you working with?')
-            st.selectbox('', key='_dl_emb_typ',
-                         options=emb_types)
-        st.write('What files would you like to download?')
-        dl_original = st.checkbox('Original data')
-        dl_embeddings = st.checkbox('Raw embeddings')
-        dl_reduction = st.checkbox('Reduced embeddings')
-        dl_labels = st.checkbox('Cluster labels')
-        st.form_submit_button('Save')
-    st.download_button('Test')
 
 
 @st.dialog('Switch Projection')
