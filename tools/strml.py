@@ -13,6 +13,8 @@ import openai
 from tools.data import compute_nn
 from tools.text import TextData
 
+from tools import oai
+
 
 def keep(key):
     """Sets a session state variable's value based on the corresponding
@@ -237,7 +239,7 @@ def generate_report():
     td = fetch_td(st.session_state.embedding_type_select)
     reduction = st.session_state.current_reduction
     cm = td.reductions[reduction].cluster_models[algo]
-    docs = td.text
+    docs = td.docs
     doc_samps = cm.sample_docs(docs=docs, max_count=samp_size)
     cluster_ids = list(doc_samps.keys())
 
@@ -246,60 +248,62 @@ def generate_report():
 
     # Prep the LLM prompt
     report = ''
-    progress_text = 'Summarizing the clusters with ChatGPT. Please wait...'
-    progress_bar = st.progress(value=0, text=progress_text)
-    for i, id in enumerate(cluster_ids[2:4]):
-        instructions = "I'm working on a qualitative analysis of a public health \
-        dataset. Here's a brief description of the dataset itself: "
-        instructions = '\n\n' + st.session_state.summary_description + '\n\n'
-        instructions += "And for context, here's a sample of documents from the \
-        dataset:\n\n"
-        for doc in doc_samps[id]:
-            instructions += doc + '\n'
-        instructions += "\nBased on these samples, what one word or phrase would \
-        you use to describe the information in the documents? Also, could you \
-        a brief summary of the samples that would help someone answer the \
-        following questions:\n\n"
-        instructions += st.session_state.summary_top_questions
-        instructions += "\n\nPlease format your answers using the following \
-        template: \n\n??**Keywords**: [KEYWORDS/PHRASES GO HERE]\n\n \
-        **Summary**: [BRIEF SUMMARY GOES HERE]??."
+    spinner_text = 'Summarizing the clusters with ChatGPT. Please wait...'
+    with st.spinner(spinner_text):
+        for i, id in enumerate(cluster_ids):
+            instructions = "I'm working on a qualitative analysis of a public health \
+            dataset. Here's a brief description of the dataset itself: "
+            instructions = '\n\n' + st.session_state.summary_description + '\n\n'
+            instructions += "And for context, here's a sample of documents from the \
+            dataset:\n\n"
+            for doc in doc_samps[id]:
+                instructions += doc + '\n'
+            instructions += "\nBased on these samples, what one word or phrase would \
+            you use to describe the information in the documents? Also, could you \
+            a brief summary of the samples that would help someone answer the \
+            following questions:\n\n"
+            instructions += st.session_state.summary_top_questions
+            instructions += "\n\nPlease format your answers using the following \
+            template: \n\n??**Keywords**: [KEYWORDS/PHRASES GO HERE]\n\n \
+            **Summary**: [BRIEF SUMMARY GOES HERE]??."
 
-        # Generate the report
-        message = [
-            {
-                "role": "system",
-                "content": st.session_state.gpt_persona
-            },
-            {
-                "role": "user",
-                "content": instructions
-            },
-        ]
-        completion = openai.ChatCompletion.create(
-            engine=st.session_state.engine,
-            messages=message,
-            temperature=st.session_state.temperature,
-            max_tokens=st.session_state.max_tokens,
-            top_p=st.session_state.top_p,
-            frequency_penalty=st.session_state.frequency_penalty,
-            presence_penalty=st.session_state.presence_penalty,
-            stop=None
-        )
-        res = completion['choices'][0]['message']['content']
-        res += '\n\n'
+            # Generate the report
+            message = [
+                {
+                    "role": "system",
+                    "content": st.session_state.gpt_persona
+                },
+                {
+                    "role": "user",
+                    "content": instructions
+                },
+            ]
+            completion = openai.ChatCompletion.create(
+                engine=st.session_state.engine,
+                messages=message,
+                temperature=st.session_state.temperature,
+                max_tokens=st.session_state.max_tokens,
+                top_p=st.session_state.top_p,
+                frequency_penalty=st.session_state.frequency_penalty,
+                presence_penalty=st.session_state.presence_penalty,
+                stop=None
+            )
+            res = completion['choices'][0]['message']['content']
+            res += '\n\n'
 
-        # Add the sample docs for reference
-        res += '**Samples**: \n'
-        for doc in doc_samps[id]:
-            res += str(doc) + '\n'
+            # Add the sample docs for reference
+            res += '**Samples**: \n'
+            for doc in doc_samps[id]:
+                res += str(doc) + '\n'
 
-        # Add the cluster-specific metrics to the top
-        res = quant_reports[id] + '\n' + res
-        report += res
-        progress_bar.progress(i + 1)
-    st.session_state.summary_report = report
-    st.toast('Report generation finished!')
+            # Add the cluster-specific metrics to the top
+            report = quant_reports[id] + '\n' + res
+            report = 'Cluster ID: ' + str(id) + '\n' + report + '\n\n'
+        st.session_state.summary_report = report
+    st.toast(
+        body='Report generation finished! Head to "Download" in the I/O \
+        section to download a copy.'
+    )
     return
 
 
@@ -309,11 +313,11 @@ def cluster_stats_to_text(cm):
     ids = list(counts.keys())
     out = {}
     for id in ids:
-        id_text = "Cluster size: " + str(cm.counts[id]) + '\n'
-        id_text += "Size rank: " + str(cm.count_ranks[id])
+        id_text = "Cluster size: " + str(int(cm.counts[id])) + '\n'
+        id_text += "Size rank: " + str(int(cm.count_ranks[id]))
         id_text  += ' of ' + str(len(ids)) + '\n'
         id_text += "Cluster variance: " + str(cm.vars[id]) + '\n'
-        id_text += "Variance rank: " + str(cm.var_ranks[id])
+        id_text += "Variance rank: " + str(int(cm.var_ranks[id]))
         id_text += ' of ' + str(len(ids))
         out.update({id: id_text})
     return out

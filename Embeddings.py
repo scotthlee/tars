@@ -24,24 +24,8 @@ st.set_page_config(page_title='Embedding Projector',
                 menu_items={'Report a Bug': 'https://github.com/scotthlee/nlp-tool/issues/new/choose',
                             'About': 'https://github.com/scotthlee/nlp-tool/'})
 
-# Fetch an API key
-def load_oai_api_key():
-    """Get API Key using Azure Service Principal."""
-    load_dotenv()
-
-    # Set up credentials based on Azure Service Principal
-    credential = ClientSecretCredential(
-        tenant_id=os.environ["SP_TENANT_ID"],
-        client_id=os.environ["SP_CLIENT_ID"],
-        client_secret=os.environ["SP_CLIENT_SECRET"]
-    )
-
-    # Set the API_KEY to the token from the Azure credentials
-    os.environ['OPENAI_API_KEY'] = credential.get_token(
-        "https://cognitiveservices.azure.com/.default").token
-
 # load the API key
-load_oai_api_key()
+oai.load_api_key()
 
 # Set up the OpenAI API settings
 st.session_state.gpt_keys = [
@@ -375,7 +359,7 @@ with st.sidebar:
             accept_multiple_files=False,
             on_change=strml.load_file
         )
-        if has_source:
+        if has_source and has_embeddings:
             st.selectbox(
                 'Text Column',
                 key='_text_column',
@@ -446,6 +430,17 @@ with st.sidebar:
     if not st.session_state.premade_loaded:
         with st.expander('Embed', expanded=(not has_embeddings) and
                          (has_data or has_source)):
+                if not has_embeddings:
+                    st.selectbox(
+                        'Text Column',
+                        key='_text_column',
+                        index=st.session_state.text_column,
+                        options=st.session_state.source_file.columns.values,
+                        on_change=strml.set_text,
+                        kwargs={'col': 'text_column'},
+                        help="Choose the column in your dataset holding the \
+                        text you'd like to embed."
+                    )
                 st.selectbox(
                     label='Type',
                     key='_embedding_type',
@@ -626,18 +621,22 @@ with st.sidebar:
                     placeholder=st.session_state.aggl_metric,
                     kwargs={'keys': ['aggl_metric']}
                 )
-            st.text_input('Keyword arguments',
-                          key='_cluster_kwargs',
-                          value=st.session_state.cluster_kwargs,
-                          kwargs={'keys': ['cluster_kwargs']},
-                          help="Extra arguments to pass to the scikit-learn \
-                          clustering model. Should be formatted as a Python \
-                          dictionary, e.g., {'kw': kw_value}. Note: the app will \
-                          not check whether these are correct before attempting \
-                          to run the algorithm, so incorrect entries may crash the \
-                          current session.")
-            st.form_submit_button('Run algorithm',
-                                  on_click=strml.run_clustering)
+            st.text_input(
+                label='Keyword arguments',
+                key='_cluster_kwargs',
+                value=st.session_state.cluster_kwargs,
+                kwargs={'keys': ['cluster_kwargs']},
+                help="Extra arguments to pass to the scikit-learn \
+                clustering model. Should be formatted as a Python \
+                dictionary, e.g., {'kw': kw_value}. Note: the app will \
+                not check whether these are correct before attempting \
+                to run the algorithm, so incorrect entries may crash the \
+                current session."
+            )
+            st.form_submit_button(
+                label='Run algorithm',
+                on_click=strml.run_clustering
+            )
     with st.expander('Plot', expanded=has_reduction):
         if has_reduction:
             if (has_metadata) or (has_clusters):
@@ -716,6 +715,7 @@ with st.sidebar:
                 dataset_description = st.text_area(
                     label='Dataset description',
                     key='_summary_description',
+                    value=st.session_state.summary_description,
                     help="Generally, what is the text in your dataset about? For \
                     example, if they come from a scientific study, you might \
                     describe the setting and goals of the study. This will \
@@ -725,7 +725,7 @@ with st.sidebar:
                 top_questions = st.text_area(
                     label='Top questions',
                     key='_summary_top_questions',
-                    placeholder=st.session_state.summary_top_questions,
+                    value=st.session_state.summary_top_questions,
                     help="What are the most important questions you'd like \
                     answered about the text in your dataset? Please write each \
                     question on its own line."
