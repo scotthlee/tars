@@ -248,6 +248,7 @@ def generate_report():
 
     # Prep the LLM prompt
     report = ''
+    completions = ''
     spinner_text = 'Summarizing the clusters with ChatGPT. Please wait...'
     with st.spinner(spinner_text):
         for i, id in enumerate(cluster_ids):
@@ -264,8 +265,8 @@ def generate_report():
             following questions:\n\n"
             instructions += st.session_state.summary_top_questions
             instructions += "\n\nPlease format your answers using the following \
-            template: \n\n??**Keywords**: [KEYWORDS/PHRASES GO HERE]\n\n \
-            **Summary**: [BRIEF SUMMARY GOES HERE]??."
+            template: \n\n??###Keywords: [KEYWORDS/PHRASES GO HERE]\n\n \
+            ###Summary: [BRIEF SUMMARY GOES HERE]??."
 
             # Generate the report
             message = [
@@ -292,15 +293,57 @@ def generate_report():
             res += '\n\n'
 
             # Add the sample docs for reference
-            res += '**Samples**: \n'
+            res += '###Samples: \n'
             for doc in doc_samps[id]:
                 res += str(doc) + '\n'
 
+            # Save the completions for writing the full summary
+            completions += res
+
             # Add the cluster-specific metrics to the top
             cl_report = quant_reports[id] + '\n' + res
-            cl_report = 'Cluster ID: ' + str(id) + '\n' + cl_report + '\n\n'
+            cl_report = '##Cluster ID: ' + str(id) + '\n' + cl_report + '\n\n'
             report += cl_report
-        st.session_state.summary_report = report
+
+        # Write the summary report based on the cluster results
+        # Generate the report
+        instructions = "I'm working on a qualitative analysis for a public \
+        health dataset. I've grouped the documents by keyword and theme and \
+        included samples from each group for you to review below:"
+        instructions += '\n\n' + completions + '\n\n'
+        instructions += "Based on these samples, please write a medium-length \
+        summary (300 to 500 words) of the whole dataset that addresses the \
+        following questions for me:\n\n"
+        instructions += st.session_state.summary_top_questions + '\n\n'
+        instructions += "Please only provide your summary--do not provide any \
+        of the information in the samples I have provided."
+        message = [
+            {
+                "role": "system",
+                "content": st.session_state.gpt_persona
+            },
+            {
+                "role": "user",
+                "content": instructions
+            },
+        ]
+        completion = openai.ChatCompletion.create(
+            engine=st.session_state.engine,
+            messages=message,
+            temperature=st.session_state.temperature,
+            max_tokens=st.session_state.max_tokens,
+            top_p=st.session_state.top_p,
+            frequency_penalty=st.session_state.frequency_penalty,
+            presence_penalty=st.session_state.presence_penalty,
+            stop=None
+        )
+        res = completion['choices'][0]['message']['content']
+        res = "#Overall Summary\n\n" + res + "\n\n\n"
+        res += "#Cluster-Specific Summaries"
+
+        # Save the report to the session state
+        st.session_state.summary_report = res + report
+
     st.toast(
         body='Report generation finished! Head to "Download" in the I/O \
         section to download a copy.'
