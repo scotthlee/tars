@@ -297,8 +297,9 @@ def generate_report():
                 res += str(doc) + '\n'
 
             # Add the cluster-specific metrics to the top
-            report = quant_reports[id] + '\n' + res
-            report = 'Cluster ID: ' + str(id) + '\n' + report + '\n\n'
+            cl_report = quant_reports[id] + '\n' + res
+            cl_report = 'Cluster ID: ' + str(id) + '\n' + cl_report + '\n\n'
+            report += cl_report
         st.session_state.summary_report = report
     st.toast(
         body='Report generation finished! Head to "Download" in the I/O \
@@ -321,6 +322,17 @@ def cluster_stats_to_text(cm):
         id_text += ' of ' + str(len(ids))
         out.update({id: id_text})
     return out
+
+
+def reset_defaults(dict, main_key):
+    """Resets a set of session state variables to their defaults values."""
+    var_dict = dict[main_key]
+    lower_name = var_dict['lower_name']
+    for k in list(var_dict['defaults'].keys()):
+        v = var_dict['defaults'][k]
+        sess_var = lower_name + '_' + k
+        st.session_state[sess_var] = v
+    return
 
 
 @st.dialog('Download Session Data')

@@ -28,8 +28,23 @@ st.set_page_config(
     }
 )
 
-# load the API key
-oai.load_api_key()
+# Fetch an API key
+def load_api_key():
+    """Get API Key using Azure Service Principal."""
+    load_dotenv()
+
+    # Set up credentials based on Azure Service Principal
+    credential = ClientSecretCredential(
+        tenant_id=os.environ["SP_TENANT_ID"],
+        client_id=os.environ["SP_CLIENT_ID"],
+        client_secret=os.environ["SP_CLIENT_SECRET"]
+    )
+
+    # Set the API_KEY to the token from the Azure credentials
+    os.environ['OPENAI_API_KEY'] = credential.get_token(
+        "https://cognitiveservices.azure.com/.default").token
+
+load_api_key()
 
 # Set up the OpenAI API settings
 st.session_state.gpt_keys = [
@@ -148,13 +163,23 @@ if 'data_type_dict' not in st.session_state:
 reduction_dict = {
     'UMAP': {
         'lower_name': 'umap',
-        'params': ['n_neighbors', 'min_dist']
+        'params': ['n_neighbors', 'min_dist'],
+        'defaults': {
+            'n_neighbors': 15,
+            'min_dist': 0.1,
+        }
     },
     't-SNE': {
         'lower_name': 'tsne',
-        'params': ['perplexity', 'learning_rate', 'n_iter']
+        'params': ['perplexity', 'learning_rate', 'n_iter'],
+        'defaults': {
+            'perplexity': 30.0,
+            'learning_rate': 1000.0,
+            'n_iter': 1000
+        }
     }
 }
+
 if 'reduction_dict' not in st.session_state:
     st.session_state.reduction_dict = reduction_dict
 if 'reduce_to_3d' not in st.session_state:
@@ -434,7 +459,7 @@ with st.sidebar:
     if not st.session_state.premade_loaded:
         with st.expander('Embed', expanded=(not has_embeddings) and
                          (has_data or has_source)):
-                if not has_embeddings:
+                if (not has_embeddings) and (has_source):
                     st.selectbox(
                         'Text Column',
                         key='_text_column',
@@ -475,7 +500,6 @@ with st.sidebar:
         st.selectbox(
             label='Method',
             options=['UMAP', 't-SNE', 'PCA'],
-            index=None,
             key='_reduction_method',
             placeholder=st.session_state.reduction_method,
             on_change=strml.update_settings,
@@ -540,6 +564,11 @@ with st.sidebar:
                 label='Start Reduction',
                 on_click=strml.reduce_dimensions,
                 disabled=not has_embeddings,
+            )
+        if st.button('Reset Default Values', disabled=not has_embeddings):
+            strml.reset_defaults(
+                dict=st.session_state.reduction_dict,
+                main_key=st.session_state.reduction_method
             )
     with st.expander('Cluster', expanded=has_reduction):
         st.selectbox(
@@ -639,7 +668,17 @@ with st.sidebar:
             )
             st.form_submit_button(
                 label='Run algorithm',
-                on_click=strml.run_clustering
+                on_click=strml.run_clustering,
+                disabled=not has_reduction
+            )
+        if st.button(
+            label='Reset Default Values',
+            disabled=not has_reduction,
+            key='reset_clustering'
+        ):
+            strml.reset_defaults(
+                dict=st.session_state.cluster_dict,
+                main_key=current_algorithm
             )
     with st.expander('Plot', expanded=has_reduction):
         if has_reduction:
