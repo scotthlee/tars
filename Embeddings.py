@@ -60,8 +60,8 @@ openai_dict = {
             'tokens_in': 16385,
             'tokens_out': 4096
         },
-        'gpt-4-turbo': {
-            'engine': 'edav-api-share-gpt4-128k-tpm25plus-v1106-dfilter',
+        'gpt-4': {
+            'engine': 'edav-api-share-gpt4-api-nofilter',
             'url': os.environ['GPT4_URL'],
             'key': os.environ["OPENAI_API_KEY"],
             'tokens_in': 128000,
@@ -80,8 +80,8 @@ openai_dict = {
 }
 openai_defaults = {
     'chat': {
-        'model': 'gpt-4-turbo',
-        'engine': 'edav-api-share-gpt4-128k-tpm25plus-v1106-dfilter',
+        'model': 'gpt-4',
+        'engine': 'edav-api-share-gpt4-api-nofilter',
         'max_tokens': None,
         'top_p': 0.95,
         'temperature': 0.20,
@@ -334,6 +334,8 @@ if 'summary_methods_section' not in st.session_state:
     st.session_state.summary_methods_section = False
 if 'summary_report' not in st.session_state:
     st.session_state.summary_report = None
+if 'summary_file_type' not in st.session_state:
+    st.session_state.summary_file_type = 'html'
 
 # Loading the handful of variables that don't persist across pages
 to_load = ['text_column', 'data_type']
@@ -792,6 +794,15 @@ with st.sidebar:
                     to ChatGPT for it to use as a reference when summarizing \
                     the information is in the cluster."
                 )
+                file_type = st.radio(
+                    label='File format',
+                    options=['html', 'text'],
+                    horizontal=True,
+                    key='_summary_file_type',
+                    help="The file format for the summary report. 'text' will \
+                    render the report plain text (.txt), and 'html' will \
+                    render it in Markdown (.html)."
+                )
                 methods_toggle = st.toggle(
                     label='Include methods section',
                     key='_summary_methods_section',
@@ -809,6 +820,7 @@ with st.sidebar:
                             'summary_top_questions',
                             'summary_n_samples',
                             'summary_cluster_choice',
+                            'summary_file_type',
                             'summary_methods_section'
                         ],
                         toast=False
