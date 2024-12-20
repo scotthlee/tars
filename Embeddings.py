@@ -430,6 +430,7 @@ with st.sidebar:
                 for mod in mods:
                     keywords.append(pd.DataFrame(mod.keywords))
                 keywords = pd.concat(keywords, axis=0).to_csv(index=False)
+                keywords = keywords.transpose()
                 st.download_button(
                     label='Cluster keywords',
                     file_name='cluster_keywords.csv',
