@@ -425,17 +425,19 @@ with st.sidebar:
                 for them.'
             )
             if has_clusters:
-                keywords = []
+                keyword_dfs = []
                 mods = list(td.reductions[cr].cluster_models.values())
                 for mod in mods:
-                    keywords.append(pd.DataFrame(mod.keywords))
-                keywords = pd.concat(keywords, axis=0)
-                keywords = keywords.transpose().to_csv(index=False)
+                    keyword_dfs.append(pd.DataFrame(mod.keywords).transpose())
+                buffer = io.BytesIO()
+                with pd.ExcelWriter(buffer) as writer:
+                    for i, df in enumerate(keyword_dfs):
+                        df.to_excel(writer, sheet_name=mods[i].model_name)
                 st.download_button(
                     label='Cluster keywords',
-                    file_name='cluster_keywords.csv',
-                    data=keywords,
-                    mime='text/csv',
+                    file_name='cluster_keywords.xlsx',
+                    data=buffer.getvalue(),
+                    mime='application/vnd.ms-excel',
                     key='_label_save'
                 )
             if has_aggl:
