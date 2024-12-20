@@ -44,9 +44,7 @@ class ClusterModel:
             }
         }
 
-    def fit(self, X,
-            main_kwargs={},
-            aux_kwargs={}):
+    def fit(self, X, main_kwargs={}, aux_kwargs={}):
         """Fits the chosen clustering model to the data."""
         # Setting up the sklearn function and associated args
         algo = self.model_name
@@ -188,6 +186,16 @@ class ClusterModel:
                 out.update(id_dict)
             return out
 
+    def sample_docs(self, docs, max_count=20, min_count=5):
+        """Samples points from each cluster and then samples the corresponding
+        documents from the provided list of documents.
+        """
+        points = self.sample_points(max_count=max_count, min_count=min_count)
+        cluster_ids = list(points.keys())
+        doc_samples = {id: [docs[i] for i in points[id]] for id in cluster_ids}
+        return doc_samples
+
+
 
 class EmbeddingReduction:
     """A container class for a dimensionally-reduced set of embeddings."""
@@ -198,6 +206,7 @@ class EmbeddingReduction:
         self.label_df = None
         self.cluster_models = {}
         self.cluster_names = {}
+        self.doc_samples = {}
 
     def cluster(self, method='HDBSCAN', main_kwargs={}, aux_kwargs={}):
         """Adds a ClusterModel to the current reduction."""
@@ -258,13 +267,13 @@ class EmbeddingReduction:
         self.name = name_str
 
     def generate_cluster_keywords(self,
-                      model,
-                      docs,
-                      method='TF-IDF',
-                      top_k=10,
-                      norm='l1',
-                      main_kwargs={},
-                      aux_kwargs={}):
+                                  docs,
+                                  model,
+                                  method='TF-IDF',
+                                  top_k=10,
+                                  norm='l1',
+                                  main_kwargs={},
+                                  aux_kwargs={}):
         """Names clusters based on the text samples they contain. Uses one of
         two approaches: cluster TF-IDF (the last step of BERTopic), or direct
         labeling with ChatGPT."""
@@ -274,6 +283,20 @@ class EmbeddingReduction:
                                                      docs=docs,
                                                      main_kwargs=main_kwargs,
                                                      aux_kwargs=aux_kwargs)
+
+    def sample_docs(self,
+                    model,
+                    docs,
+                    max_count=20,
+                    min_count=5):
+        """Randomly samples documents from each cluster given by the specified
+        clustering model.
+        """
+        doc_samples = self.cluster_models[model].sample_docs(docs=docs,
+                                                             max_count=max_count,
+                                                             min_count=min_count)
+        self.doc_samples.update({model: doc_samples})
+
 
 
 def make_dendrogram(model):

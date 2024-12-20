@@ -18,14 +18,18 @@ from tools import oai, data, text, strml
 
 
 # Fire up the page
-st.set_page_config(page_title='NLP Tool',
-                layout='wide',
-                page_icon='📖',
-                menu_items={'Report a Bug': 'https://github.com/scotthlee/nlp-tool/issues/new/choose',
-                            'About': 'https://github.com/scotthlee/nlp-tool/'})
+st.set_page_config(
+    page_title='Embedding Projector',
+    layout='wide',
+    page_icon='📽',
+    menu_items={
+        'Report a Bug': 'https://github.com/scotthlee/nlp-tool/issues/new/choose',
+        'About': 'https://github.com/scotthlee/nlp-tool/'
+    }
+)
 
 # Fetch an API key
-def load_oai_api_key():
+def load_api_key():
     """Get API Key using Azure Service Principal."""
     load_dotenv()
 
@@ -40,8 +44,7 @@ def load_oai_api_key():
     os.environ['OPENAI_API_KEY'] = credential.get_token(
         "https://cognitiveservices.azure.com/.default").token
 
-# load the API key
-load_oai_api_key()
+load_api_key()
 
 # Set up the OpenAI API settings
 st.session_state.gpt_keys = [
@@ -57,8 +60,8 @@ openai_dict = {
             'tokens_in': 16385,
             'tokens_out': 4096
         },
-        'gpt-4-turbo': {
-            'engine': 'edav-api-share-gpt4-128k-tpm25plus-v1106-dfilter',
+        'gpt-4': {
+            'engine': 'edav-api-share-gpt4-api-nofilter',
             'url': os.environ['GPT4_URL'],
             'key': os.environ["OPENAI_API_KEY"],
             'tokens_in': 128000,
@@ -77,8 +80,8 @@ openai_dict = {
 }
 openai_defaults = {
     'chat': {
-        'model': 'gpt-4-turbo',
-        'engine': 'edav-api-share-gpt4-128k-tpm25plus-v1106-dfilter',
+        'model': 'gpt-4',
+        'engine': 'edav-api-share-gpt4-api-nofilter',
         'max_tokens': None,
         'top_p': 0.95,
         'temperature': 0.20,
@@ -99,6 +102,9 @@ if 'chat_engine' not in st.session_state:
     st.session_state.engine = openai_defaults['chat']['engine']
 if 'chat_engine_choices' not in st.session_state:
     st.session_state.engine_choices = list(openai_dict['chat'].keys())
+if 'gpt_persona' not in st.session_state:
+    st.session_state.gpt_persona = "You are a health communications specialist \
+    with expertise in qualitative analysis."
 
 if 'embedding_engine' not in st.session_state:
     st.session_state.embedding_engine = openai_defaults['embeddings']['engine']
@@ -129,6 +135,10 @@ if 'frequency_penalty' not in st.session_state:
     st.session_state.frequency_penalty = openai_defaults['chat']['frequency_penalty']
 
 # Setting up the I?O objects
+if 'embedding_type_select' not in st.session_state:
+    st.session_state.embedding_type_select = None
+if 'reduction_select' not in st.session_state:
+    st.session_state.reduction_select = None
 if 'premade_loaded' not in st.session_state:
     st.session_state.premade_loaded = False
 if 'text_data_dict' not in st.session_state:
@@ -146,7 +156,6 @@ if 'data_type' not in st.session_state:
 if 'data_type_dict' not in st.session_state:
     st.session_state.data_type_dict = {
         'Tabular data with text column': ['csv'],
-        'Bulk documents': ['pdf', 'txt'],
         'Premade embeddings': ['csv', 'tsv']
     }
 
@@ -154,13 +163,23 @@ if 'data_type_dict' not in st.session_state:
 reduction_dict = {
     'UMAP': {
         'lower_name': 'umap',
-        'params': ['n_neighbors', 'min_dist']
+        'params': ['n_neighbors', 'min_dist'],
+        'defaults': {
+            'n_neighbors': 15,
+            'min_dist': 0.1,
+        }
     },
     't-SNE': {
         'lower_name': 'tsne',
-        'params': ['perplexity', 'learning_rate', 'n_iter']
+        'params': ['perplexity', 'learning_rate', 'n_iter'],
+        'defaults': {
+            'perplexity': 30.0,
+            'learning_rate': 1000.0,
+            'n_iter': 1000
+        }
     }
 }
+
 if 'reduction_dict' not in st.session_state:
     st.session_state.reduction_dict = reduction_dict
 if 'reduce_to_3d' not in st.session_state:
@@ -274,7 +293,7 @@ for k in ['original', 'embeddings', 'reduction', 'labels']:
     if 'dl_' + k not in st.session_state:
         st.session_state['dl_' + k] = False
 
-# And finally the plotting options
+# Setting up the plotting options
 if 'map_in_3d' not in st.session_state:
     st.session_state.map_in_3d = True
 if 'label_columns' not in st.session_state:
@@ -302,6 +321,22 @@ if 'show_legend' not in st.session_state:
 if st.session_state.map_in_3d:
     st.session_state.hover_data.update({'d3': False})
 
+# Setting up the summary report options
+if 'summary_description' not in st.session_state:
+    st.session_state.summary_description = ''
+if 'summary_top_questions' not in st.session_state:
+    st.session_state.summary_top_questions = 'Question 1\nQuestion 2\n...'
+if 'summary_cluster_choice' not in st.session_state:
+    st.session_state.cluster_choice = None
+if 'summary_n_samles' not in st.session_state:
+    st.session_state.summary_n_samples = 10
+if 'summary_methods_section' not in st.session_state:
+    st.session_state.summary_methods_section = False
+if 'summary_report' not in st.session_state:
+    st.session_state.summary_report = None
+if 'summary_file_type' not in st.session_state:
+    st.session_state.summary_file_type = 'html'
+
 # Loading the handful of variables that don't persist across pages
 to_load = ['text_column', 'data_type']
 for key in to_load:
@@ -309,9 +344,10 @@ for key in to_load:
         strml.unkeep(key)
 
 # Specifying the current text data object for shorthand
-td_name = st.session_state.current_text_data
+td_name = st.session_state.embedding_type_select
 has_data = td_name is not None
 has_source = st.session_state.source_file is not None
+has_report = st.session_state.summary_report is not None
 tabular_source = st.session_state.data_type == 'Tabular data with text column'
 
 # Some bools for controlling menu expansion and container rendering
@@ -336,34 +372,106 @@ else:
     has_aggl = False
 
 with st.sidebar:
+    st.subheader('I/O')
     with st.expander('Load', expanded=not (has_source or has_data)):
-        st.radio('What kind of data do you want to load?',
-                 options=list(st.session_state.data_type_dict.keys()),
-                 key='_data_type',
-                 on_change=strml.update_settings,
-                 kwargs={'keys': ['data_type']},
-                 help="The kind of data you want to load. If you don't have \
-                 embeddings made yet, choose tabular data or bulk documents, \
-                 depending on how your text is saved, to get started.")
-        st.file_uploader(label='Select the file(s)',
-                         type=st.session_state.data_type_dict[st.session_state.data_type],
-                         key='_source_file',
-                         accept_multiple_files=st.session_state.data_type == 'Bulk documents',
-                         on_change=strml.load_file)
-        if has_metadata:
-            pass
+        st.radio(
+            'What kind of data do you want to load?',
+            options=list(st.session_state.data_type_dict.keys()),
+            key='_data_type',
+            on_change=strml.update_settings,
+            kwargs={'keys': ['data_type']},
+            help="The kind of data you want to load. If you don't have \
+            embeddings made yet, choose tabular data to get started."
+        )
+        st.file_uploader(
+            label='Select the file(s)',
+            type=st.session_state.data_type_dict[st.session_state.data_type],
+            key='_source_file',
+            accept_multiple_files=False,
+            on_change=strml.load_file
+        )
+        if has_source and (not tabular_source):
+            st.selectbox(
+                'Text Column',
+                key='_text_column',
+                index=st.session_state.text_column,
+                options=st.session_state.source_file.columns.values,
+                on_change=strml.set_text,
+                kwargs={'col': 'text_column'},
+                help="Choose the column in your dataset holding the \
+                text you'd like to embed."
+            )
+    with st.expander('Download', expanded=False):
+        if has_embeddings:
+            st.download_button(
+                label='Embeddings',
+                data=td.embeddings.to_csv(index=False),
+                file_name='embeddings.csv',
+                mime='text/csv',
+                key='_embed_save',
+                help='Downloads the raw embeddings.'
+            )
+        if has_reduction:
+            cr = st.session_state.current_reduction
+            rd_df = td.reductions[cr].points.to_csv(index=False)
+            st.download_button(
+                label='Data reduction',
+                data=rd_df,
+                file_name=cr + '.csv',
+                mime='text/csv',
+                key='_reduc_save',
+                help='Downloads the current set of reduced-dimension \
+                embeddings, along with any cluster IDs that were generated \
+                for them.'
+            )
+            if has_clusters:
+                keywords = []
+                mods = list(td.reductions[cr].cluster_models.values())
+                for mod in mods:
+                    keywords.append(pd.DataFrame(mod.keywords))
+                keywords = pd.concat(keywords, axis=0).to_csv(index=False)
+                st.download_button(
+                    label='Cluster keywords',
+                    file_name='cluster_keywords.csv',
+                    data=keywords,
+                    mime='text/csv',
+                    key='_label_save'
+                )
+            if has_aggl:
+                mod = td.reductions[cr]['cluster_models']['aggl']
+                fig = data.make_dendrogram(mod)
+                buf = io.BytesIO()
+                fig.savefig(buf, format='svg')
+                st.download_button(
+                    label='Dendrogram',
+                    data=buf,
+                    mime='image/svg',
+                    file_name='dendrogram.svg',
+                    help='Downloads the clustering dendrogram.'
+                )
+            if has_report:
+                st.download_button(
+                    label='Summary Report',
+                    file_name='summary_report.html',
+                    data=st.session_state.summary_report,
+                    mime='text/html'
+                )
+    st.divider()
+    st.subheader('Analysis')
     if not st.session_state.premade_loaded:
         with st.expander('Embed', expanded=(not has_embeddings) and
                          (has_data or has_source)):
                 if tabular_source and has_source:
-                    st.selectbox('Text Column',
-                                 key='_text_column',
-                                 index=st.session_state.text_column,
-                                 options=st.session_state.source_file.columns.values,
-                                 on_change=strml.set_text,
-                                 kwargs={'col': 'text_column'},
-                                 help="Choose the column in your dataset holding the \
-                                 text you'd like to embed.")
+                    st.selectbox(
+                        'Text Column',
+                        key='_text_column',
+                        index=st.session_state.text_column,
+                        options=st.session_state.source_file.columns.values,
+                        on_change=strml.set_text,
+                        kwargs={'col': 'text_column'},
+                        help="Choose the column in your dataset holding the \
+                        text you'd like to embed."
+                    )
                 st.selectbox(
                     label='Type',
                     key='_embedding_type',
@@ -383,153 +491,199 @@ with st.sidebar:
                     help='The model that will generate the embeddings. For more info \
                     about the different models, see the README.'
                 )
-                st.button(label='Generate embeddings',
-                          key='_embed_go',
-                          disabled=(not st.session_state.enable_generate_button),
-                          on_click=strml.fetch_embeddings)
-    with st.expander('Reduce', expanded=(not has_reduction) and
+                st.button(
+                    label='Generate embeddings',
+                    key='_embed_go',
+                    disabled=(not st.session_state.enable_generate_button),
+                    on_click=strml.fetch_embeddings
+                )
+    with st.expander('Shrink', expanded=(not has_reduction) and
                      has_embeddings):
-        st.selectbox(label='Method',
-                     options=['UMAP', 't-SNE', 'PCA'],
-                     index=None,
-                     key='_reduction_method',
-                     placeholder=st.session_state.reduction_method,
-                     on_change=strml.update_settings,
-                     kwargs={'keys': ['reduction_method']},
-                     help='The algorithm used to reduce the dimensionality \
-                     of the embeddings to make them viewable in 2- or 3-D.')
+        st.selectbox(
+            label='Method',
+            options=['UMAP', 't-SNE', 'PCA'],
+            key='_reduction_method',
+            placeholder=st.session_state.reduction_method,
+            on_change=strml.update_settings,
+            kwargs={'keys': ['reduction_method']},
+            help='The algorithm used to reduce the dimensionality \
+            of the embeddings to make them viewable in 2- or 3-D.'
+        )
         with st.form('_reduce_param_form', border=False):
             if st.session_state.reduction_method == 'UMAP':
-                st.slider('Nearest neighbors',
-                          min_value=2,
-                          max_value=200,
-                          key='_umap_n_neighbors',
-                          value=st.session_state.umap_n_neighbors,
-                          help='This parameter controls how UMAP balances \
-                          local versus global structure. Low values will force \
-                          UMAP to concentrate on very local structure, while \
-                          large values will push UMAP to look at larger \
-                          neighborhoods of each point when estimating \
-                          the mainfold structure of the data.')
-                st.slider('Minimum distance',
-                          min_value=0.0,
-                          max_value=1.0,
-                          step=0.001,
-                          value=st.session_state.umap_min_dist,
-                          key='_umap_min_dist',
-                          help='Controls how tightly UMAP is allowed to pack \
-                          points together.')
+                st.slider(
+                    label='Nearest neighbors',
+                    min_value=2,
+                    max_value=200,
+                    key='_umap_n_neighbors',
+                    value=st.session_state.umap_n_neighbors,
+                    help='This parameter controls how UMAP balances \
+                    local versus global structure. Low values will force \
+                    UMAP to concentrate on very local structure, while \
+                    large values will push UMAP to look at larger \
+                    neighborhoods of each point when estimating \
+                    the mainfold structure of the data.'
+                )
+                st.slider(
+                    label='Minimum distance',
+                    min_value=0.0,
+                    max_value=1.0,
+                    step=0.001,
+                    value=st.session_state.umap_min_dist,
+                    key='_umap_min_dist',
+                    help='Controls how tightly UMAP is allowed to pack \
+                          points together.'
+                )
             if st.session_state.reduction_method == 't-SNE':
-                st.slider('Perplexity',
-                          min_value=5.0,
-                          max_value=50.0,
-                          value=st.session_state.tsne_perplexity,
-                          key='_tsne_perplexity')
-                st.slider('Learning rate',
-                          min_value=100.00,
-                          max_value=1000.00,
-                          value=st.session_state.tsne_learning_rate,
-                          key='_tsne_learning_rate')
-                st.slider('Number of iterations',
-                          min_value=200,
-                          max_value=10000,
-                          value=st.session_state.tsne_n_iter,
-                          key='_tsne_n_iter')
-            st.toggle(label='3D',
-                      key='_reduce_to_3d',
-                      value=st.session_state.reduce_to_3d,
-                      help='Whether to reduce the embeddings to 3 dimensions \
-                      (instead of 2).')
-            st.form_submit_button('Start Reduction',
-                      on_click=strml.reduce_dimensions)
+                st.slider(
+                    label='Perplexity',
+                    min_value=5.0,
+                    max_value=50.0,
+                    value=st.session_state.tsne_perplexity,
+                    key='_tsne_perplexity'
+                )
+                st.slider(
+                    label='Learning rate',
+                    min_value=100.00,
+                    max_value=1000.00,
+                    value=st.session_state.tsne_learning_rate,
+                    key='_tsne_learning_rate'
+                )
+                st.slider(
+                    label='Number of iterations',
+                    max_value=10000,
+                    value=st.session_state.tsne_n_iter,
+                    key='_tsne_n_iter'
+                )
+            st.toggle(
+                label='3D',
+                key='_reduce_to_3d',
+                value=st.session_state.reduce_to_3d,
+                help='Whether to reduce the embeddings to 3 dimensions \
+                (instead of 2).'
+            )
+            st.form_submit_button(
+                label='Start Reduction',
+                on_click=strml.reduce_dimensions,
+                disabled=not has_embeddings,
+            )
+        if st.button('Reset Default Values', disabled=not has_embeddings):
+            strml.reset_defaults(
+                dict=st.session_state.reduction_dict,
+                main_key=st.session_state.reduction_method
+            )
     with st.expander('Cluster', expanded=has_reduction):
-        st.selectbox('Algorithm',
-                     options=list(cluster_dict.keys()),
-                     key='_clustering_algorithm',
-                     index=None,
-                     placeholder=st.session_state.clustering_algorithm,
-                     on_change=strml.update_settings,
-                     kwargs={'keys': ['clustering_algorithm']},
-                     help='The algorithm to use for grouping the embeddings \
-                     into clusters.')
+        st.selectbox(
+            label='Algorithm',
+            options=list(cluster_dict.keys()),
+            key='_clustering_algorithm',
+            index=None,
+            placeholder=st.session_state.clustering_algorithm,
+            on_change=strml.update_settings,
+            kwargs={'keys': ['clustering_algorithm']},
+            help='The algorithm to use for grouping the embeddings \
+            into clusters.'
+        )
         current_algorithm = st.session_state.clustering_algorithm
         with st.form(key='_cluster_param_form', border=False):
             if current_algorithm == 'DBSCAN':
-                st.number_input('Epsilon',
-                          min_value=0.001,
-                          max_value=10.0,
-                          value=st.session_state.dbscan_eps,
-                          key='_dbscan_eps',
-                          help='The maximum distance between two samples for one \
-                          to be considered as in the neighborhood of the other.')
-                st.number_input('Minimum samples',
-                          min_value=1,
-                          max_value=100,
-                          value=st.session_state.dbscan_min_samples,
-                          key='_dbscan_min_samples',
-                          help='The number of samples in a neighborhood for a \
-                          point to be considered as a core point. At higher \
-                          values, the algorithm will find denser clusters, and \
-                          at lower values, the clusters will be more sparser.')
+                st.number_input(
+                    label='Epsilon',
+                    min_value=0.001,
+                    max_value=10.0,
+                    value=st.session_state.dbscan_eps,
+                    key='_dbscan_eps',
+                    help='The maximum distance between two samples for one \
+                    to be considered as in the neighborhood of the other.'
+                )
+                st.number_input(
+                    label='Minimum samples',
+                    min_value=1,
+                    max_value=100,
+                    value=st.session_state.dbscan_min_samples,
+                    key='_dbscan_min_samples',
+                    help='The number of samples in a neighborhood for a \
+                    point to be considered as a core point. At higher \
+                    values, the algorithm will find denser clusters, and \
+                    at lower values, the clusters will be more sparser.'
+                )
             elif current_algorithm == 'HDBSCAN':
-                st.number_input('Minimum cluster size',
-                                min_value=2,
-                                max_value=1000,
-                                key='_hdbscan_min_cluster_size',
-                                value=st.session_state.hdbscan_min_cluster_size)
-                st.number_input('Minimum samples',
-                                min_value=1,
-                                max_value=1000,
-                                key='_hdbscan_min_samples',
-                                value=st.session_state.hdbscan_min_samples)
+                st.number_input(
+                    label='Minimum cluster size',
+                    min_value=2,
+                    max_value=1000,
+                    key='_hdbscan_min_cluster_size',
+                    value=st.session_state.hdbscan_min_cluster_size,
+                    help='The minimum number of samples in a group for the \
+                    group to be considered a cluster. Groupings smaller than \
+                    this size will be left as noise.'
+                )
+                st.number_input(
+                    label='Minimum samples',
+                    min_value=1,
+                    max_value=1000,
+                    key='_hdbscan_min_samples',
+                    value=st.session_state.hdbscan_min_samples,
+                    help='The parameter k used to calculate the distance \
+                    between a point x_p and its k-th nearest neighbor. When \
+                    None, defaults to the minimum cluster size.'
+                )
             elif current_algorithm == 'k-means':
-                st.number_input('Number of clusters',
-                          min_value=1,
-                          max_value=100,
-                          key='_kmeans_n_clusters',
-                          value=st.session_state.kmeans_n_clusters,
-                          help='The number of clusters to form, as well as the \
-                          number of centroids to generate.')
-                st.number_input('Max iterations',
-                          min_value=1,
-                          max_value=500,
-                          key='_kmeans_max_iter',
-                          value=st.session_state.kmeans_max_iter,
-                          help='The maximum number of iterations for the algorithm \
-                          to run.')
+                st.number_input(
+                    label='Number of clusters',
+                    min_value=1,
+                    max_value=100,
+                    key='_kmeans_n_clusters',
+                    value=st.session_state.kmeans_n_clusters,
+                    help='The number of clusters to form, as well as the number\
+                    of centroids to generate.'
+                )
+                st.number_input(
+                    label='Max iterations',
+                    min_value=1,
+                    max_value=500,
+                    key='_kmeans_max_iter',
+                    value=st.session_state.kmeans_max_iter,
+                    help='The maximum number of iterations for the algorithm \
+                    to run.'
+                )
             elif current_algorithm == 'Agglomerative':
-                st.selectbox('Metric',
-                             options=['euclidean', 'l1', 'l2',
-                                      'manhattan', 'cosine'],
-                             key='_aggl_metric',
-                             index=None,
-                             placeholder=st.session_state.aggl_metric,
-                             kwargs={'keys': ['aggl_metric']})
-            st.text_input('Keyword arguments',
-                          key='_cluster_kwargs',
-                          value=st.session_state.cluster_kwargs,
-                          kwargs={'keys': ['cluster_kwargs']},
-                          help="Extra arguments to pass to the scikit-learn \
-                          clustering model. Should be formatted as a Python \
-                          dictionary, e.g., {'kw': kw_value}. Note: the app will \
-                          not check whether these are correct before attempting \
-                          to run the algorithm, so incorrect entries may crash the \
-                          current session.")
-            st.form_submit_button('Run algorithm',
-                                  on_click=strml.run_clustering)
+                st.selectbox(
+                    label='Metric',
+                    options=['euclidean', 'l1', 'l2', 'manhattan', 'cosine'],
+                    key='_aggl_metric',
+                    index=None,
+                    placeholder=st.session_state.aggl_metric,
+                    kwargs={'keys': ['aggl_metric']}
+                )
+            st.text_input(
+                label='Keyword arguments',
+                key='_cluster_kwargs',
+                value=st.session_state.cluster_kwargs,
+                kwargs={'keys': ['cluster_kwargs']},
+                help="Extra arguments to pass to the scikit-learn \
+                clustering model. Should be formatted as a Python \
+                dictionary, e.g., {'kw': kw_value}. Note: the app will \
+                not check whether these are correct before attempting \
+                to run the algorithm, so incorrect entries may crash the \
+                current session."
+            )
+            st.form_submit_button(
+                label='Run algorithm',
+                on_click=strml.run_clustering,
+                disabled=not has_reduction
+            )
+        if st.button(
+            label='Reset Default Values',
+            disabled=not has_reduction,
+            key='reset_clustering'
+        ):
+            strml.reset_defaults(
+                dict=st.session_state.cluster_dict,
+                main_key=current_algorithm
+            )
     with st.expander('Plot', expanded=has_reduction):
         if has_reduction:
-            st.selectbox('Choose a reduction',
-                         index=None,
-                         key='_current_reduction',
-                         options=list(td.reductions.keys()),
-                         placeholder=st.session_state.current_reduction,
-                         on_change=strml.switch_reduction,
-                         help='Choose a lower-dimension version of the \
-                         embeddings to display. PCA is calculated and \
-                         displayed by default, but you can add other \
-                         reductions to the list using the "Reduce" widget \
-                         above.')
             if (has_metadata) or (has_clusters):
                 display_cols = []
                 if has_clusters:
@@ -600,46 +754,83 @@ with st.sidebar:
                   help='How tall you want the scatterplot to be. It will fill \
                   the width of the screen by default, but the height is \
                   adjustable.')
-    with st.expander('Download', expanded=False):
-        if has_embeddings:
-            st.download_button(label='Embeddings',
-                               data=td.embeddings.to_csv(index=False),
-                               file_name='embeddings.csv',
-                               mime='text/csv',
-                               key='_embed_save',
-                               help='Downloads the raw embeddings.')
-        if has_reduction:
-            cr = st.session_state.current_reduction
-            rd_df = td.reductions[cr].points.to_csv(index=False)
-            st.download_button(label='Data reduction',
-                               data=rd_df,
-                               file_name=cr + '.csv',
-                               mime='text/csv',
-                               key='_reduc_save',
-                               help='Downloads the current set of \
-                               reduced-dimension embeddings, along with any \
-                               cluster IDs that were generated for them.')
-            if has_clusters:
-                keywords = []
-                mods = list(td.reductions[cr].cluster_models.values())
-                for mod in mods:
-                    keywords.append(pd.DataFrame(mod.keywords))
-                keywords = pd.concat(keywords, axis=0).to_csv(index=False)
-                st.download_button(label='Cluster summaries',
-                                   file_name='cluster_keywords.csv',
-                                   data=keywords,
-                                   mime='text/csv',
-                                   key='_label_save')
-            if has_aggl:
-                mod = td.reductions[cr]['cluster_models']['aggl']
-                fig = data.make_dendrogram(mod)
-                buf = io.BytesIO()
-                fig.savefig(buf, format='svg')
-                st.download_button(label='Dendrogram',
-                                   data=buf,
-                                   mime='image/svg',
-                                   file_name='dendrogram.svg',
-                                   help='Downloads the clustering dendrogram.')
+    if has_clusters:
+        with st.expander('Summarize', expanded=False):
+            with st.form(key='summary_form', border=False):
+                dataset_description = st.text_area(
+                    label='Dataset description',
+                    key='_summary_description',
+                    value=st.session_state.summary_description,
+                    help="Generally, what is the text in your dataset about? For \
+                    example, if they come from a scientific study, you might \
+                    describe the setting and goals of the study. This will \
+                    serve as context for ChatGPT as it summarizes the \
+                    information in the dataset."
+                )
+                top_questions = st.text_area(
+                    label='Top questions',
+                    key='_summary_top_questions',
+                    value=st.session_state.summary_top_questions,
+                    help="What are the most important questions you'd like \
+                    answered about the text in your dataset? Please write each \
+                    question on its own line."
+                )
+                cluster_choice = st.selectbox(
+                    label='Clustering choice',
+                    key='_summary_cluster_choice',
+                    options=td.reductions[cr].label_df.columns.values,
+                    help="Which clustering result would you like to use to \
+                    group the embeddings? Each cluster will be summarized on \
+                    its own, and the then those summaries will be used to \
+                    produce a top-level summary for the whole datset."
+                )
+                n_samples = st.number_input(
+                    label='Number of samples',
+                    min_value=1,
+                    max_value=50,
+                    value=st.session_state.summary_n_samples,
+                    key='_summary_n_samples',
+                    help="How many samples from each cluster you'd like to send \
+                    to ChatGPT for it to use as a reference when summarizing \
+                    the information is in the cluster."
+                )
+                file_type = st.radio(
+                    label='File format',
+                    options=['html', 'text'],
+                    horizontal=True,
+                    key='_summary_file_type',
+                    help="The file format for the summary report. 'text' will \
+                    render the report plain text (.txt), and 'html' will \
+                    render it in Markdown (.html)."
+                )
+                methods_toggle = st.toggle(
+                    label='Include methods section',
+                    key='_summary_methods_section',
+                    value=st.session_state.summary_methods_section,
+                    disabled=True,
+                    help="Whether to include a methods section in the summary \
+                    report with information about your chosen embedding model, \
+                    dimensionality-reduction algorithm, and clustering \
+                    algorithm."
+                )
+                if st.form_submit_button('Generate report'):
+                    strml.update_settings(
+                        keys=[
+                            'summary_description',
+                            'summary_top_questions',
+                            'summary_n_samples',
+                            'summary_cluster_choice',
+                            'summary_file_type',
+                            'summary_methods_section'
+                        ],
+                        toast=False
+                    )
+                    strml.generate_report()
+    st.divider()
+    st.subheader('Options')
+    if has_reduction:
+        if st.button('Switch projection'):
+            strml.switch_projection()
 
 # Making the main visualization
 with st.container(border=True):
@@ -665,7 +856,6 @@ with st.container(border=True):
         if st.session_state.map_in_3d:
             fig = px.scatter_3d(data_frame=display_data,
                                 x='d1', y='d2', z='d3',
-                                title=st.session_state.current_reduction,
                                 hover_data=hover_data,
                                 color=st.session_state.color_column,
                                 opacity=st.session_state.marker_opacity,
@@ -674,7 +864,6 @@ with st.container(border=True):
             fig = px.scatter(data_frame=display_data,
                              x='d1', y='d2',
                              hover_data=hover_data,
-                             title=st.session_state.current_reduction,
                              color=st.session_state.color_column,
                              opacity=st.session_state.marker_opacity,
                              height=st.session_state.plot_height)
