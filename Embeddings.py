@@ -429,8 +429,8 @@ with st.sidebar:
                 mods = list(td.reductions[cr].cluster_models.values())
                 for mod in mods:
                     keywords.append(pd.DataFrame(mod.keywords))
-                keywords = pd.concat(keywords, axis=0).to_csv(index=False)
-                keywords = keywords.transpose()
+                keywords = pd.concat(keywords, axis=0)
+                keywords = keywords.transpose().to_csv(index=False)
                 st.download_button(
                     label='Cluster keywords',
                     file_name='cluster_keywords.csv',

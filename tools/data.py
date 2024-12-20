@@ -55,6 +55,10 @@ class ClusterModel:
 
         # Doing a deep copy so as not to change the input data
         X = deepcopy(X)
+        
+        # Kludge; dropping columns with "_id" to make sure X is numeric
+        to_drop = [s for s in X.columns.values if '_id' in s]
+        X = X.drop(labels=to_drop, axis=1)
 
         # Fit the underlying model
         with st.spinner('Running the clustering algorithm...'):
@@ -211,9 +215,11 @@ class EmbeddingReduction:
     def cluster(self, method='HDBSCAN', main_kwargs={}, aux_kwargs={}):
         """Adds a ClusterModel to the current reduction."""
         mod = ClusterModel(model_name=method)
-        mod.fit(X=deepcopy(self.points),
-                main_kwargs=main_kwargs,
-                aux_kwargs=aux_kwargs)
+        mod.fit(
+            X=deepcopy(self.points),
+            main_kwargs=main_kwargs,
+            aux_kwargs=aux_kwargs
+        )
         self.cluster_models.update({mod.model_name: mod})
         if self.label_df is None:
             self.label_df = mod.labels
@@ -266,35 +272,37 @@ class EmbeddingReduction:
             name_str = 'PCA'
         self.name = name_str
 
-    def generate_cluster_keywords(self,
-                                  docs,
-                                  model,
-                                  method='TF-IDF',
-                                  top_k=10,
-                                  norm='l1',
-                                  main_kwargs={},
-                                  aux_kwargs={}):
+    def generate_cluster_keywords(
+            self,
+            docs,
+            model,
+            method='TF-IDF',
+            top_k=10,
+            norm='l1',
+            main_kwargs={},
+            aux_kwargs={}
+        ):
         """Names clusters based on the text samples they contain. Uses one of
         two approaches: cluster TF-IDF (the last step of BERTopic), or direct
         labeling with ChatGPT."""
-        self.cluster_models[model].generate_keywords(method=method,
-                                                     top_k=top_k,
-                                                     norm=norm,
-                                                     docs=docs,
-                                                     main_kwargs=main_kwargs,
-                                                     aux_kwargs=aux_kwargs)
+        self.cluster_models[model].generate_keywords(
+            method=method,
+            top_k=top_k,
+            norm=norm,
+            docs=docs,
+            main_kwargs=main_kwargs,
+            aux_kwargs=aux_kwargs
+        )
 
-    def sample_docs(self,
-                    model,
-                    docs,
-                    max_count=20,
-                    min_count=5):
+    def sample_docs(self, model, docs, max_count=20, min_count=5):
         """Randomly samples documents from each cluster given by the specified
         clustering model.
         """
-        doc_samples = self.cluster_models[model].sample_docs(docs=docs,
-                                                             max_count=max_count,
-                                                             min_count=min_count)
+        doc_samples = self.cluster_models[model].sample_docs(
+            docs=docs,
+            ax_count=max_count,
+            min_count=min_count
+        )
         self.doc_samples.update({model: doc_samples})
 
 
@@ -325,10 +333,12 @@ def make_dendrogram(model):
 def compute_nn(embeddings, n_neighbors=250, metric='euclidean'):
     """Pre-computes the nearest neighbors graph for UMAP."""
     with st.spinner('Calculating nearest neighbors...'):
-        nn = nearest_neighbors(embeddings,
-                               n_neighbors=n_neighbors,
-                               metric=metric,
-                               metric_kwds=None,
-                               angular=False,
-                               random_state=None)
+        nn = nearest_neighbors(
+            embeddings,
+            n_neighbors=n_neighbors,
+            metric=metric,
+            metric_kwds=None,
+            angular=False,
+            random_state=None
+        )
     return nn

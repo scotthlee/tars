@@ -193,10 +193,12 @@ def run_clustering():
         st.session_state[p] for p in param_names}
     aux_kwargs = ast.literal_eval(st.session_state.cluster_kwargs)
     td = fetch_td(st.session_state.embedding_type_select)
-    td.cluster(reduction=st.session_state.current_reduction,
-               method=algo,
-               main_kwargs=main_kwargs,
-               aux_kwargs=aux_kwargs)
+    td.cluster(
+        reduction=st.session_state.current_reduction,
+        method=algo,
+        main_kwargs=main_kwargs,
+        aux_kwargs=aux_kwargs
+    )
     if td.docs is not None:
         td.generate_cluster_keywords(
             reduction=st.session_state.current_reduction,
@@ -222,9 +224,11 @@ def generate_cluster_keywords():
     td = fetch_td(st.session_state.embedding_type_select)
     reduction = st.session_state.current_reduction
     model = st.session_state.clustering_algorithm
-    td.generate_cluster_keywords(reduction=st.session_state.current_reduction,
-                                 method='TF-IDF',
-                                 model=model)
+    td.generate_cluster_keywords(
+        reduction=reduction,
+        method='TF-IDF',
+        model=model
+    )
     return
 
 
