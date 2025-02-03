@@ -31,6 +31,31 @@ Users can get summaries of the information in each of the embedding clusters in 
 ### Downloading Artifacts
 At any point during a work session, users can download whatever data artifacts have been generated. Download buttons will appear in the `I/O` expander menu for the raw embeddings, reduced-dimensionality embeddings, cluster keywords, and LLM-generated cluster summary report as they are created by the app. Cluster IDs are attached to rows in the files holding the reduced embeddings and cluster keywords, and cluster sizes and variances are provided in the summary report, along with the corresponding cluster IDs. 
 
+## Deployment Options
+### Posit Connect
+There are a number of ways to [deploy Streamlit apps](https://docs.posit.co/connect/user/streamlit/) on Posit Connect. The command-line deployment is an easy option, which you can do by following these steps:
+
+1. Clone or download this repo.
+2. Install the required dependencies (these are listed in requirements.txt).
+3. Navigate to the folder holding the repo (so, one level up from where the repo files are stored).
+4. Open a command prompt or terminal and paste in the following command:
+
+<pre>rsconnect deploy streamlit \
+--server https://rconnect.edav.cdc.gov/ \
+--api-key YOUR_API_KEY \
+--entrypoint Embeddings.py \
+--environment GPT4_URL \
+--environment API_TYPE \
+--environment API_VERSION \
+--environment SP_TENANT_ID \
+--environment SP_CLIENT_ID \
+--environment SP_CLIENT_SECRET \
+nlp-tool/</pre>
+
+If you'd rather add your environment variables to the app after deployment, you can delete those lines, and if you run into errors with authentication during deployment, you can try adding the `--insecure` flag to the command, although that may not adhere to security best practices. In all cases, you will need an API key for your Posit Connect account, and your account will probably need Publisher access to the platform. If you haven't set those up yet, contact EDAV for more help.
+
+**Note**: This version of the app requires an Azure Service Principal with access to the Azure OpenAI API. Environment variables should match how they are used in the code, for example, so that `GPT4_URL` is the base URL for the relevant Azure OpenAI model deployments (the app uses `gpt-4-turbo` and `text-embedding-ada-002`), `API_TYPE` is 'azure_ad', `SP_TENANT_ID` is your Service Principal tenant ID, and so on. Please reach out to either your program informatics lead or EDAV technical support for help setting those up, if you run into issues.
+
 ## Public Domain Standard Notice
 This repository constitutes a work of the United States Government and is not
 subject to domestic copyright protection under 17 USC § 105. This repository is in
