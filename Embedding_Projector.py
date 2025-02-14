@@ -17,6 +17,20 @@ from umap import UMAP
 from tools import oai, data, text, strml
 
 
+# Setting the "about" section text
+about_text = 'APP_NAME_HERE is a web app, written in Streamlit, for \
+generating and analyzing text embeddings. Broadly, the app recreates \
+the analytic flow of embeddings-based topic-modeling algorithms like \
+BERTopic, allowing users to generate embeddings, reduce their \
+dimensionality, and cluster them in the dimensionally-reduced space. \
+Like BERTopic, the app can generate lists of potential topics using a \
+cluster-based variant of TF-IDF, but, by way of LLM-based iterative \
+summarization, it can also generate free-text summaries of the \
+information in the clusters. The app makes these summaries, as well as\
+any data artifacts generated during a session, available for download \
+and further analysis offline. \n\n For more information, see the full \
+README at https://github.com/scotthlee/nlp-tool/'
+
 # Fire up the page
 st.set_page_config(
     page_title='Embedding Projector',
@@ -24,9 +38,12 @@ st.set_page_config(
     page_icon='📽',
     menu_items={
         'Report a Bug': 'https://github.com/scotthlee/nlp-tool/issues/new/choose',
-        'About': 'https://github.com/scotthlee/nlp-tool/'
+        'About': about_text
     }
 )
+
+if 'about_text' not in st.session_state:
+    st.session_state.about_text = about_text
 
 # Fetch an API key
 def load_api_key():
@@ -356,10 +373,14 @@ if has_data:
     has_embeddings = td.embeddings is not None
     has_reduction = bool(td.reductions)
     has_metadata = td.metadata is not None
+    if has_metadata:
+        st.session_state.metadata_columns = td.metadata.columns.values
     if has_reduction:
         cr = st.session_state.current_reduction
         has_clusters = td.reductions[cr].label_df is not None
         has_aggl = 'aggl' in list(td.reductions[cr].cluster_models.keys())
+        if has_clusters:
+            pass
     else:
         has_reduction = False
         has_clusters = False
