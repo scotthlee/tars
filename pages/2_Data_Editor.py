@@ -44,11 +44,13 @@ if has_data:
         # Setting the basic components
         cr = st.session_state.current_reduction
         has_clusters = td.reductions[cr].label_df is not None
-        has_aggl = 'aggl' in list(td.reductions[cr].cluster_models.keys())
         rd_df = td.reductions[cr].points
 
-        # Assembling the data to display
-        full_dataset = pd.concat([td.metadata, rd_df], axis=1)
+        # Assembling the current version of the full dataset (reduction,
+        # metadata, and then cluster labels)
+        full_dataset = rd_df
+        if has_metadata:
+            full_dataset = pd.concat([td.metadata, rd_df], axis=1)
         if has_clusters:
             cluster_labels = td.reductions[cr].label_df
             cluster_cols = cluster_labels.columns.values
@@ -66,8 +68,13 @@ if has_data:
             to_display = full_dataset
 
         # Applying column selection
-        if st.session_state.display_column_select != []:
+        columns_chosen = st.session_state.display_column_select != []
+        if columns_chosen:
             to_display = to_display[st.session_state.display_column_select]
+
+        # Record the indices from the full dataset we're currently showing so
+        # that we can update the correct row when changes are made
+        active_ids = to_display.index.values
 
         # Form for choosing which columns to display
         with st.sidebar:
@@ -93,26 +100,22 @@ if has_data:
                     help='If you would like ot filter the data by one of \
                     the columns, choose the column here.'
                 )
-                with st.form('Filter form', border=False):
-                    if st.session_state.display_filter_column is not None:
-                        filter_values = to_display[
-                            st.session_state.display_filter_column
-                        ].unique()
-                    else:
-                        filter_values = []
-                    st.multiselect(
-                        label='Filter Values',
-                        key='_display_filter_values',
-                        options=filter_values,
-                        help='Only rows with this value of your chosen filter \
-                        column will be shown.'
-                    )
-                    if st.form_submit_button('Refresh Data'):
-                        strml.update_settings([
-                            'display_filter_values'
-                        ])
+                if st.session_state.display_filter_column is not None:
+                    filter_values = full_dataset[
+                        st.session_state.display_filter_column
+                    ].unique()
+                else:
+                    filter_values = []
+                st.multiselect(
+                    label='Filter Values',
+                    key='_display_filter_values',
+                    options=filter_values,
+                    on_change=strml.update_settings,
+                    kwargs={'keys': ['display_filter_values']},
+                    help='Only rows with this value of your chosen filter \
+                    column will be shown.'
+                )
 
-                        st.rerun()
             with st.expander('Options', expanded=True):
                 st.number_input(
                     label='Viewer Height',
@@ -129,24 +132,22 @@ if has_data:
                 object's metadata and cluster labels.
                 '''
                 current_view = st.session_state.data_display
-                current_columns = st.session_state.display_column_select
-                temp_full = deepcopy(full_dataset)
-                if filtering_on:
-                    filter_vals = st.session_state.display_filter_values
-                    filter_col = st.session_state.display_filter_column
-                    temp_full.loc[
-                        temp_full[filter_col] == filter_vals,
-                        current_columns
-                    ] = current_view
-                else:
-                    temp_full = current_view
-                td.metadata = temp_full[td.metadata.columns.values]
-                td.reductions[cr].label_df = temp_full[cluster_cols]
-                st.rerun()
+                changed_dict = current_view['edited_rows']
+                changed_row = list(current_view['edited_rows'].keys())[0]
+                changed_index = active_ids[int(changed_row)]
+                changed_column = str(list(changed_dict[changed_row].keys())[0])
+                new_value = changed_dict[changed_row][changed_column]
+                if has_metadata:
+                    if changed_column in td.metadata.columns.values:
+                        td.metadata.loc[changed_index, changed_column] = new_value
+                if has_clusters:
+                    if changed_column in td.reductions[cr].label_df:
+                        td.reductions[cr].label_df.loc[changed_index, changed_column] = new_value
 
-        # Render the dataframe
+        # Render the dataframe, hiding the dim redux columns to avoid botching
+        # the current projection
         st.data_editor(
-            data=to_display,
+            data=pd.DataFrame(to_display),
             key='data_display',
             on_change=change_data,
             height=st.session_state.data_editor_height
