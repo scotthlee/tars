@@ -182,6 +182,7 @@ def run_clustering():
     """Runs a cluster analysis on the user's chosen reduction. Cluster IDs and \
     centers are saved to the reduction's dictionary entry for plotting.
     """
+    # Fetch the algorithm and hyperparameter choices from the main menu
     algo = st.session_state.clustering_algorithm
     cd = st.session_state.cluster_dict
     mod_name = cd[algo]['sklearn_name']
@@ -192,13 +193,22 @@ def run_clustering():
     main_kwargs = {p.replace(lower_name + '_', ''):
         st.session_state[p] for p in param_names}
     aux_kwargs = ast.literal_eval(st.session_state.cluster_kwargs)
+
+    # Fetch and reformat the column name for the eventual cluster IDs
+    col_name = st.session_state.cluster_column_name
+    col_name = col_name.replace(' ', '_')
+
+    # Fetch the current TextData object and run the clustering algorithm
     td = fetch_td(st.session_state.embedding_type_select)
     td.cluster(
         reduction=st.session_state.current_reduction,
         method=algo,
+        id_str=col_name,
         main_kwargs=main_kwargs,
         aux_kwargs=aux_kwargs
     )
+
+    # Optionally generate cluster-specific keywords, if metadata are available
     if td.docs is not None:
         td.generate_cluster_keywords(
             reduction=st.session_state.current_reduction,

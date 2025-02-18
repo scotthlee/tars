@@ -26,7 +26,7 @@ dimensionality, and cluster them in the dimensionally-reduced space. \
 Like BERTopic, the app can generate lists of potential topics using a \
 cluster-based variant of TF-IDF, but, by way of LLM-based iterative \
 summarization, it can also generate free-text summaries of the \
-information in the clusters. The app makes these summaries, as well as\
+information in the clusters. The app makes these summaries, as well as \
 any data artifacts generated during a session, available for download \
 and further analysis offline. \n\n For more information, see the full \
 README at https://github.com/scotthlee/nlp-tool/'
@@ -294,6 +294,8 @@ if 'clustering_algorithm' not in st.session_state:
     st.session_state.clustering_algorithm = 'DBSCAN'
 if 'cluster_kwargs' not in st.session_state:
     st.session_state.cluster_kwargs = {}
+if 'cluster_column_name' not in st.session_state:
+    st.session_state.cluster_column_name = ''
 
 # Setting up the labeling options
 if 'label_how' not in st.session_state:
@@ -609,6 +611,7 @@ with st.sidebar:
             into clusters.'
         )
         current_algorithm = st.session_state.clustering_algorithm
+        default_name = cluster_dict[current_algorithm]['lower_name']
         with st.form(key='_cluster_param_form', border=False):
             if current_algorithm == 'DBSCAN':
                 st.number_input(
@@ -680,6 +683,13 @@ with st.sidebar:
                     placeholder=st.session_state.aggl_metric,
                     kwargs={'keys': ['aggl_metric']}
                 )
+            st.text_input(
+                label='Cluster column name',
+                key='_cluster_column_name',
+                value=cluster_dict[current_algorithm]['lower_name'] + '_id',
+                help='What to name the column holding the cluster IDs after \
+                the algorithm runs.'
+            )
             st.text_input(
                 label='Keyword arguments',
                 key='_cluster_kwargs',

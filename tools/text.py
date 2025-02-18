@@ -63,10 +63,12 @@ class TextData:
     def cluster(self,
                 reduction,
                 method,
+                id_str=None,
                 main_kwargs={},
                 aux_kwargs={}):
         """Runs a clustering algorithm on one of the object's reductions."""
         self.reductions[reduction].cluster(method=method,
+                                           id_str=id_str,
                                            main_kwargs=main_kwargs,
                                            aux_kwargs=aux_kwargs)
         return

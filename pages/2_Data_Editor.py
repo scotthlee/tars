@@ -94,7 +94,7 @@ if has_data:
                 st.selectbox(
                     label='Filter On',
                     key='_display_filter_column',
-                    options=st.session_state._display_column_select,
+                    options=to_display.columns.values,
                     on_change=strml.update_settings,
                     kwargs={'keys': ['display_filter_column']},
                     help='If you would like ot filter the data by one of \
