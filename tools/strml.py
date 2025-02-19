@@ -215,8 +215,6 @@ def run_clustering():
             model=algo
         )
 
-    # Reset the colum name field
-    st.session_state._cluster_column_name = ''
     return
 
 
@@ -240,7 +238,8 @@ def generate_cluster_keywords():
     td.generate_cluster_keywords(
         reduction=reduction,
         method='TF-IDF',
-        model=model
+        model=model,
+        id_str=st.session_state._cluster_column_name
     )
     return
 

@@ -125,6 +125,7 @@ class ClusterModel:
 
     def generate_keywords(self,
                           docs,
+                          id_str=None,
                           method='TF-IDF',
                           norm='l1',
                           top_k=10,
@@ -133,17 +134,20 @@ class ClusterModel:
         """Geneates the to keywords for each cluster."""
         # Merge docs with cluster IDs
         lower_name = self.model_choices[self.model_name]['lower_name']
-        id_name = lower_name + '_id'
         cluster_df = deepcopy(self.labels)
         cluster_df['docs'] = docs
         cluster_df.docs = cluster_df.docs.astype(str)
 
+        # Set default cluster labeling name
+        if id_str is None:
+            id_str = lower_name + '_id'
+
         if method == 'TF-IDF':
             # Merge the docs in each cluster
-            cluster_ids = cluster_df[id_name].unique()
+            cluster_ids = cluster_df[id_str].unique()
             clustered_docs = []
             for id in cluster_ids:
-                doc_blob = ' '.join(cluster_df.docs[cluster_df[id_name] == id])
+                doc_blob = ' '.join(cluster_df.docs[cluster_df[id_str] == id])
                 clustered_docs.append(doc_blob)
 
             # Vectorize the clustered documents and fetch the vocabulary

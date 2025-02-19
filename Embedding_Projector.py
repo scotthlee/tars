@@ -703,11 +703,12 @@ with st.sidebar:
                 to run the algorithm, so incorrect entries may crash the \
                 current session."
             )
-            st.form_submit_button(
+            if st.form_submit_button(
                 label='Run algorithm',
-                on_click=strml.run_clustering,
                 disabled=not has_reduction
-            )
+            ):
+                strml.run_clustering()
+                st.rerun()
         if st.button(
             label='Reset Default Values',
             disabled=not has_reduction,
