@@ -18,7 +18,7 @@ from tools import oai, data, text, strml
 
 
 # Setting the "about" section text
-about_text = 'APP_NAME_HERE is a web app, written in Streamlit, for \
+about_text = 'TARS is a web app, written in Streamlit, for \
 generating and analyzing text embeddings. Broadly, the app recreates \
 the analytic flow of embeddings-based topic-modeling algorithms like \
 BERTopic, allowing users to generate embeddings, reduce their \
