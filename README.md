@@ -6,11 +6,21 @@
 APP_NAME_HERE is a web app, written in [Streamlit](https://streamlit.io/), for generating and analyzing text embeddings. Broadly, the app recreates the analytic flow of embeddings-based topic-modeling algorithms like [BERTopic](https://maartengr.github.io/BERTopic/index.html), allowing users to generate embeddings, reduce their dimensionality, and cluster them in the dimensionally-reduced space. Like BERTopic, the app can generate lists of potential topics using a cluster-based variant of [TF-IDF](https://en.wikipedia.org/wiki/Tf–idf), but, by way of LLM-based iterative summarization, it can also generate free-text summaries of the information in the clusters. The app makes these summaries, as well as any data artifacts generated during a session, available for download and further analysis offline.
 
 ## User Interface
-The user interface is divided into two main components: a viewing pane for rendering the embeddings in 3- or 2-d space, and a sidebar for working with the embeddings. The sidebar is divided into three subsections: `I/O`, for loading and downloading session data; `Analysis`, for generating, shrinking, clustering, and summarizing the embeddings; and `Options`, for changing the current data projection view and managing advanced session settings.
+The app has two pages: an embedding projector for working with the embeddings, and a data editor for editing the underlying session metadata and clustering results. Both pages point to the same set of underlying data objects, so changes to the data in one should propagate to the other, and vice-versa.
+
+### Embebedding Projector
+The projector interface is divided into two main components: a viewing pane for rendering the embeddings in 3- or 2-d space, and a sidebar for working with the embeddings. The sidebar is divided into three subsections: `I/O`, for loading and downloading session data; `Analysis`, for generating, shrinking, clustering, and summarizing the embeddings; and `Options`, for changing the current data projection view and managing advanced session settings.
 
 ![Screenshot](data/main.png)
 
 Some of the expander menus are available at the beginning of a session, while others will only appear after certain artifacts have been generated, like by uploading a dataset or by running a clustering algorithm. If something doesn't appear when or where you think it should, though, please open an [issue](https://github.com/scotthlee/nlp-tool/issues/) so we can take a look.
+
+### Data Editor
+The editor is also divided into two components: a viewing pane that displays the current session data (i.e., whatever is plotted on the projector page), and a sidebar with a few simple tools for filtering and reshaping the same. 
+
+![Screenshot](data/editor_page.png)
+
+Currently, the app does not have a version control system in place for the session data, so any changes here will permanently overwrite the previous version. We hope to add support for reverting changes in the near future, but for now, user beware!
 
 ## Getting Started
 ### Data Loading
