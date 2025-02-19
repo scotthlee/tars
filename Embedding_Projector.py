@@ -91,7 +91,8 @@ openai_dict = {
             'url': os.environ['GPT4_URL'],
             'key': os.environ['OPENAI_API_KEY'],
             'type': 'openai',
-            'tokens_in': 8191
+            'tokens_in': 2048,
+            'document_limit': None
         }
     }
 }
