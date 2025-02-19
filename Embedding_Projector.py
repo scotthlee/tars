@@ -17,6 +17,20 @@ from umap import UMAP
 from tools import oai, data, text, strml
 
 
+# Setting the "about" section text
+about_text = 'APP_NAME_HERE is a web app, written in Streamlit, for \
+generating and analyzing text embeddings. Broadly, the app recreates \
+the analytic flow of embeddings-based topic-modeling algorithms like \
+BERTopic, allowing users to generate embeddings, reduce their \
+dimensionality, and cluster them in the dimensionally-reduced space. \
+Like BERTopic, the app can generate lists of potential topics using a \
+cluster-based variant of TF-IDF, but, by way of LLM-based iterative \
+summarization, it can also generate free-text summaries of the \
+information in the clusters. The app makes these summaries, as well as \
+any data artifacts generated during a session, available for download \
+and further analysis offline. \n\n For more information, see the full \
+README at https://github.com/scotthlee/nlp-tool/'
+
 # Fire up the page
 st.set_page_config(
     page_title='Embedding Projector',
@@ -24,9 +38,12 @@ st.set_page_config(
     page_icon='📽',
     menu_items={
         'Report a Bug': 'https://github.com/scotthlee/nlp-tool/issues/new/choose',
-        'About': 'https://github.com/scotthlee/nlp-tool/'
+        'About': about_text
     }
 )
+
+if 'about_text' not in st.session_state:
+    st.session_state.about_text = about_text
 
 # Fetch an API key
 def load_api_key():
@@ -74,7 +91,8 @@ openai_dict = {
             'url': os.environ['GPT4_URL'],
             'key': os.environ['OPENAI_API_KEY'],
             'type': 'openai',
-            'tokens_in': 8191
+            'tokens_in': 2048,
+            'document_limit': None
         }
     }
 }
@@ -277,6 +295,8 @@ if 'clustering_algorithm' not in st.session_state:
     st.session_state.clustering_algorithm = 'DBSCAN'
 if 'cluster_kwargs' not in st.session_state:
     st.session_state.cluster_kwargs = {}
+if 'cluster_column_name' not in st.session_state:
+    st.session_state.cluster_column_name = ''
 
 # Setting up the labeling options
 if 'label_how' not in st.session_state:
@@ -356,10 +376,14 @@ if has_data:
     has_embeddings = td.embeddings is not None
     has_reduction = bool(td.reductions)
     has_metadata = td.metadata is not None
+    if has_metadata:
+        st.session_state.metadata_columns = td.metadata.columns.values
     if has_reduction:
         cr = st.session_state.current_reduction
         has_clusters = td.reductions[cr].label_df is not None
         has_aggl = 'aggl' in list(td.reductions[cr].cluster_models.keys())
+        if has_clusters:
+            pass
     else:
         has_reduction = False
         has_clusters = False
@@ -588,6 +612,7 @@ with st.sidebar:
             into clusters.'
         )
         current_algorithm = st.session_state.clustering_algorithm
+        default_name = cluster_dict[current_algorithm]['lower_name']
         with st.form(key='_cluster_param_form', border=False):
             if current_algorithm == 'DBSCAN':
                 st.number_input(
@@ -659,6 +684,13 @@ with st.sidebar:
                     placeholder=st.session_state.aggl_metric,
                     kwargs={'keys': ['aggl_metric']}
                 )
+            st.text_input(
+                label='Cluster column name',
+                key='_cluster_column_name',
+                value=cluster_dict[current_algorithm]['lower_name'] + '_id',
+                help='What to name the column holding the cluster IDs after \
+                the algorithm runs.'
+            )
             st.text_input(
                 label='Keyword arguments',
                 key='_cluster_kwargs',

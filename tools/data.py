@@ -44,7 +44,7 @@ class ClusterModel:
             }
         }
 
-    def fit(self, X, main_kwargs={}, aux_kwargs={}):
+    def fit(self, X, id_str=None, main_kwargs={}, aux_kwargs={}):
         """Fits the chosen clustering model to the data."""
         # Setting up the sklearn function and associated args
         algo = self.model_name
@@ -53,11 +53,15 @@ class ClusterModel:
         kwargs = {**main_kwargs, **aux_kwargs}
         mod = globals()[mod_name](**kwargs)
 
+        # Set the column name, if not provided
+        if id_str is None:
+            id_str = lower_name + '_id'
+
         # Doing a deep copy so as not to change the input data
         X = deepcopy(X)
-        
+
         # Kludge; dropping columns with "_id" to make sure X is numeric
-        to_drop = [s for s in X.columns.values if '_id' in s]
+        to_drop = [s for s in X.columns.values if s not in ['d1', 'd2', 'd3']]
         X = X.drop(labels=to_drop, axis=1)
 
         # Fit the underlying model
@@ -67,7 +71,6 @@ class ClusterModel:
         # Set some class-level attributes, like the cluster ID data frame and
         # the sklearn model name
         labels = np.array(mod.labels_).astype(str)
-        id_str = lower_name + '_id'
         self.labels = pd.DataFrame(labels, columns=[id_str])
         self.model = mod
         self.params = kwargs
@@ -212,15 +215,22 @@ class EmbeddingReduction:
         self.cluster_names = {}
         self.doc_samples = {}
 
-    def cluster(self, method='HDBSCAN', main_kwargs={}, aux_kwargs={}):
+    def cluster(self, method='HDBSCAN', id_str=None, main_kwargs={}, aux_kwargs={}):
         """Adds a ClusterModel to the current reduction."""
         mod = ClusterModel(model_name=method)
         mod.fit(
             X=deepcopy(self.points),
+            id_str=id_str,
             main_kwargs=main_kwargs,
             aux_kwargs=aux_kwargs
         )
-        self.cluster_models.update({mod.model_name: mod})
+        mod_name = mod.model_name
+        current_models = self.cluster_models.keys()
+        mod_count = sum([mod_name in s for s in current_models])
+        if mod_count > 0:
+            mod_name += '_' + str(mod_count)
+
+        self.cluster_models.update({mod_name: mod})
         if self.label_df is None:
             self.label_df = mod.labels
         else:
