@@ -195,7 +195,7 @@ def run_clustering():
     aux_kwargs = ast.literal_eval(st.session_state.cluster_kwargs)
 
     # Fetch and reformat the column name for the eventual cluster IDs
-    col_name = st.session_state.cluster_column_name
+    col_name = st.session_state._cluster_column_name
     col_name = col_name.replace(' ', '_')
 
     # Fetch the current TextData object and run the clustering algorithm
@@ -214,6 +214,9 @@ def run_clustering():
             reduction=st.session_state.current_reduction,
             model=algo
         )
+
+    # Reset the colum name field
+    st.session_state._cluster_column_name = ''
     return
 
 

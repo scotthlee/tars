@@ -56,12 +56,12 @@ class ClusterModel:
         # Set the column name, if not provided
         if id_str is None:
             id_str = lower_name + '_id'
-        
+
         # Doing a deep copy so as not to change the input data
         X = deepcopy(X)
 
         # Kludge; dropping columns with "_id" to make sure X is numeric
-        to_drop = [s for s in X.columns.values if '_id' in s]
+        to_drop = [s for s in X.columns.values if s not in ['d1', 'd2', 'd3']]
         X = X.drop(labels=to_drop, axis=1)
 
         # Fit the underlying model
