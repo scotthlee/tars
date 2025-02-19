@@ -18,7 +18,7 @@ from tools import oai, data, text, strml
 
 
 # Setting the "about" section text
-about_text = 'TARS is a web app, written in Streamlit, for \
+about_text = 'TARS is a Streamlit app for \
 generating and analyzing text embeddings. Broadly, the app recreates \
 the analytic flow of embeddings-based topic-modeling algorithms like \
 BERTopic, allowing users to generate embeddings, reduce their \
@@ -29,7 +29,7 @@ summarization, it can also generate free-text summaries of the \
 information in the clusters. The app makes these summaries, as well as \
 any data artifacts generated during a session, available for download \
 and further analysis offline. \n\n For more information, see the full \
-README at https://github.com/scotthlee/nlp-tool/'
+README at https://github.com/scotthlee/tars/'
 
 # Fire up the page
 st.set_page_config(
