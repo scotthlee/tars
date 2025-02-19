@@ -39,13 +39,13 @@ At any point during a work session, users can download whatever data artifacts h
 
 ## Deployment Options
 ### Local Machine
-To run the app locally, you'll need to be using a CDC-issued computer that's connected to the CDC network, either directly by being on campus, or indirectly over ZScaler. If that's you, then you can follow these steps to get up and running:
+To run the app locally, you'll need to be using a computer with access to the Azure OpenAI API. If that's you, then you can follow these steps to get up and running:
 
 1. Clone or download this repo.
 2. Install the required dependencies (these are listed in requirements.txt).
 3. Open a command prompt (Windows) or terminal (Linux).
 4. Navigate to the repo folder.
-5. Launch the app by entering `streamlit run Embeddings.py` in the command prompt or terminal.
+5. Launch the app by entering `streamlit run Embedding_Projector.py` in the command prompt or terminal.
 
 ### Posit Connect
 There are a number of ways to [deploy Streamlit apps](https://docs.posit.co/connect/user/streamlit/) on Posit Connect. The command-line deployment is an easy option, which you can do by following these steps:
@@ -56,7 +56,7 @@ There are a number of ways to [deploy Streamlit apps](https://docs.posit.co/conn
 4. Open a command prompt or terminal and paste in the following command:
 
 <pre>rsconnect deploy streamlit \
---server https://rconnect.edav.cdc.gov/ \
+--server POSIT_CONNECT_SERVER_ADDRESS \
 --api-key YOUR_API_KEY \
 --entrypoint Embeddings.py \
 --environment GPT4_URL \
@@ -65,12 +65,12 @@ There are a number of ways to [deploy Streamlit apps](https://docs.posit.co/conn
 --environment SP_TENANT_ID \
 --environment SP_CLIENT_ID \
 --environment SP_CLIENT_SECRET \
-nlp-tool/</pre>
+tars/</pre>
 
-If you'd rather add your environment variables to the app after deployment, you can delete those lines, and if you run into errors with authentication during deployment, you can try adding the `--insecure` flag to the command, although that may not adhere to security best practices. In all cases, you will need an API key for your Posit Connect account, and your account will probably need Publisher access to the platform. If you haven't set those up yet, contact EDAV for more help.
+If you'd rather add your environment variables to the app after deployment, you can delete those lines, and if you run into errors with authentication during deployment, you can try adding the `--insecure` flag to the command, although that may not adhere to security best practices. In all cases, you will need an API key for your Posit Connect account (`YOUR_API_KEY` in the example above), and your account will probably need Publisher access to the platform.
 
 ### Notes
-This version of the app requires an Azure Service Principal with access to the Azure OpenAI API. Environment variables should match how they are used in the code, for example, so that `GPT4_URL` is the base URL for the relevant Azure OpenAI model deployments (the app uses `gpt-4-turbo` and `text-embedding-ada-002`), `API_TYPE` is 'azure_ad', `SP_TENANT_ID` is your Service Principal tenant ID, and so on. Please reach out to either your program informatics lead or EDAV technical support for help setting those up, if you run into issues.
+This version of the app requires an Azure Service Principal with access to the Azure OpenAI API. Environment variables should match how they are used in the code, for example, so that `GPT4_URL` is the base URL for the relevant Azure OpenAI model deployments (the app uses `gpt-4-turbo` and `text-embedding-ada-002`), `API_TYPE` is 'azure_ad', `SP_TENANT_ID` is your Service Principal tenant ID, and so on.
 
 ## License Standard Notice
 The repository utilizes code licensed under the terms of the Apache Software
