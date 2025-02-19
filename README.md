@@ -58,7 +58,7 @@ There are a number of ways to [deploy Streamlit apps](https://docs.posit.co/conn
 <pre>rsconnect deploy streamlit \
 --server POSIT_CONNECT_SERVER_ADDRESS \
 --api-key YOUR_API_KEY \
---entrypoint Embeddings.py \
+--entrypoint Embedding_Projector.py \
 --environment GPT4_URL \
 --environment API_TYPE \
 --environment API_VERSION \
