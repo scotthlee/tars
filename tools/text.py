@@ -73,28 +73,32 @@ class TextData:
                                            aux_kwargs=aux_kwargs)
         return
 
-    def generate_cluster_keywords(self,
-                      reduction,
-                      model,
-                      docs=None,
-                      method='TF-IDF',
-                      top_k=10,
-                      norm='l1',
-                      main_kwargs={},
-                      aux_kwargs={}):
+    def generate_cluster_keywords(
+            self,
+            reduction,
+            model,
+            docs=None,
+            method='TF-IDF',
+            top_k=10,
+            norm='l1',
+            main_kwargs={},
+            aux_kwargs={}
+        ):
         """Names clusters based on the text samples they contain. Uses one of
         two approaches: cluster TF-IDF (the last step of BERTopic), or direct
         labeling with ChatGPT.
         """
         if docs is None:
             docs = self.docs
-        self.reductions[reduction].generate_cluster_keywords(model=model,
-                                                             method=method,
-                                                             top_k=top_k,
-                                                             norm=norm,
-                                                             docs=docs,
-                                                             main_kwargs=main_kwargs,
-                                                             aux_kwargs=aux_kwargs)
+        self.reductions[reduction].generate_cluster_keywords(
+            model=model,
+            method=method,
+            top_k=top_k,
+            norm=norm,
+            docs=docs,
+            main_kwargs=main_kwargs,
+            aux_kwargs=aux_kwargs
+        )
         return
 
 

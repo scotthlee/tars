@@ -9,6 +9,7 @@ from sklearn.metrics import silhouette_score
 from sklearn.cluster import KMeans, DBSCAN, HDBSCAN, AgglomerativeClustering
 from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
 from sklearn.preprocessing import normalize, scale
+from sklearn import metrics
 from umap import UMAP
 from umap.umap_ import nearest_neighbors
 from matplotlib import pyplot as plt
@@ -25,6 +26,13 @@ class ClusterModel:
         self.keywords = None
         self.counts = None
         self.model_name = model_name
+        self.id_str = None
+        self.score_functions = [
+            'silhouette_score',
+            'calinski_harabasz_score',
+            'davies_bouldin_score',
+        ]
+        self.scores = {}
         self.model_choices = {
             'DBSCAN': {
                 'sklearn_name': 'DBSCAN',
@@ -56,6 +64,7 @@ class ClusterModel:
         # Set the column name, if not provided
         if id_str is None:
             id_str = lower_name + '_id'
+        self.id_str = id_str
 
         # Doing a deep copy so as not to change the input data
         X = deepcopy(X)
@@ -99,6 +108,9 @@ class ClusterModel:
         self._calculate_centers(X, id_str)
         self._calculate_metrics(X, id_str)
 
+        # Scoring the current clustering scheme across the three metrics
+        self._score(X, id_str, labels)
+
         return
 
     def _calculate_centers(self, X, id):
@@ -120,17 +132,23 @@ class ClusterModel:
             w_vars = grouped.var(numeric_only=True).sum(axis=1)
             c_vars = centers.var(numeric_only=True).sum()
             self.icc = c_vars / (w_vars.mean() + c_vars)
-            self.silhouette = silhouette_score(X, X[id])
         return
 
-    def generate_keywords(self,
-                          docs,
-                          id_str=None,
-                          method='TF-IDF',
-                          norm='l1',
-                          top_k=10,
-                          main_kwargs={},
-                          aux_kwargs={}):
+    def _score(self, X, id, labels):
+        for score_function in self.score_functions:
+            sklearn_func = getattr(metrics, score_function)
+            self.scores.update({id: {score_function: sklearn_func(X, labels)}})
+
+    def generate_keywords(
+        self,
+        docs,
+        id_str=None,
+        method='TF-IDF',
+        norm='l1',
+        top_k=10,
+        main_kwargs={},
+        aux_kwargs={}
+        ):
         """Geneates the to keywords for each cluster."""
         # Merge docs with cluster IDs
         lower_name = self.model_choices[self.model_name]['lower_name']
@@ -215,11 +233,19 @@ class EmbeddingReduction:
         self.dimensions = dimensions
         self.points = None
         self.label_df = None
+        self.id_strs = []
         self.cluster_models = {}
         self.cluster_names = {}
         self.doc_samples = {}
+        self.cluster_scores = {}
 
-    def cluster(self, method='HDBSCAN', id_str=None, main_kwargs={}, aux_kwargs={}):
+    def cluster(
+            self,
+            method='HDBSCAN',
+            id_str=None,
+            main_kwargs={},
+            aux_kwargs={}
+        ):
         """Adds a ClusterModel to the current reduction."""
         mod = ClusterModel(model_name=method)
         mod.fit(
@@ -228,6 +254,7 @@ class EmbeddingReduction:
             main_kwargs=main_kwargs,
             aux_kwargs=aux_kwargs
         )
+        self.id_strs.append(mod.id_str)
         mod_name = mod.model_name
         current_models = self.cluster_models.keys()
         mod_count = sum([mod_name in s for s in current_models])
@@ -235,6 +262,7 @@ class EmbeddingReduction:
             mod_name += '_' + str(mod_count)
 
         self.cluster_models.update({mod_name: mod})
+        self.cluster_scores.update(mod.scores)
         if self.label_df is None:
             self.label_df = mod.labels
         else:
@@ -287,20 +315,22 @@ class EmbeddingReduction:
         self.name = name_str
 
     def generate_cluster_keywords(
-            self,
-            docs,
-            model,
-            method='TF-IDF',
-            top_k=10,
-            norm='l1',
-            main_kwargs={},
-            aux_kwargs={}
+        self,
+        docs,
+        model,
+        id_str=None,
+        method='TF-IDF',
+        top_k=10,
+        norm='l1',
+        main_kwargs={},
+        aux_kwargs={}
         ):
         """Names clusters based on the text samples they contain. Uses one of
         two approaches: cluster TF-IDF (the last step of BERTopic), or direct
         labeling with ChatGPT."""
         self.cluster_models[model].generate_keywords(
             method=method,
+            id_str=id_str,
             top_k=top_k,
             norm=norm,
             docs=docs,
@@ -356,3 +386,19 @@ def compute_nn(embeddings, n_neighbors=250, metric='euclidean'):
             random_state=None
         )
     return nn
+
+
+def train_and_score_cluster_model(
+    data,
+    algorithm,
+    id_str=None,
+    metric='silhouette_score',
+    ):
+    """Trains and scores a cluster model. Wrapper to be used when optimizing
+    hyperparameters for auto-clustering.
+    """
+    model = ClusterModel(model_name=algorithm)
+    model.fit(data, id_str=id_str)
+    score_func = getattr(metrics, metric)
+    score = score_func(X=data, labels=model.label_df[id_str].values)
+    return score

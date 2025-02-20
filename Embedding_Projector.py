@@ -887,8 +887,7 @@ with st.container(border=True):
             cluster_cols = current_reduc.label_df.columns.values
             display_data[cluster_cols] = current_reduc.label_df.values
         if has_metadata:
-            display_data = pd.concat([display_data, td.metadata],
-                                     axis=1)
+            display_data = pd.concat([display_data, td.metadata], axis=1)
         if st.session_state.map_in_3d:
             fig = px.scatter_3d(data_frame=display_data,
                                 x='d1', y='d2', z='d3',
