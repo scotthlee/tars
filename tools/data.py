@@ -240,11 +240,11 @@ class EmbeddingReduction:
         self.cluster_scores = {}
 
     def cluster(
-            self,
-            method='HDBSCAN',
-            id_str=None,
-            main_kwargs={},
-            aux_kwargs={}
+        self,
+        method='HDBSCAN',
+        id_str=None,
+        main_kwargs={},
+        aux_kwargs={}
         ):
         """Adds a ClusterModel to the current reduction."""
         mod = ClusterModel(model_name=method)
@@ -386,19 +386,3 @@ def compute_nn(embeddings, n_neighbors=250, metric='euclidean'):
             random_state=None
         )
     return nn
-
-
-def train_and_score_cluster_model(
-    data,
-    algorithm,
-    id_str=None,
-    metric='silhouette_score',
-    ):
-    """Trains and scores a cluster model. Wrapper to be used when optimizing
-    hyperparameters for auto-clustering.
-    """
-    model = ClusterModel(model_name=algorithm)
-    model.fit(data, id_str=id_str)
-    score_func = getattr(metrics, metric)
-    score = score_func(X=data, labels=model.label_df[id_str].values)
-    return score
