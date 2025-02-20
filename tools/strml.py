@@ -225,7 +225,7 @@ def run_clustering():
         main_kwargs=main_kwargs,
         aux_kwargs=aux_kwargs
     )
-    
+
     # Optionally generate cluster-specific keywords, if metadata are available
     if td.docs is not None:
         td.generate_cluster_keywords(
@@ -432,7 +432,8 @@ def reset_defaults(dict, main_key):
     return
 
 
-def auto_clustering(
+def run_auto_clustering(
+    id_str=None,
     metric='silhouette_score'
     ):
     pass

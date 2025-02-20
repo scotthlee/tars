@@ -299,6 +299,12 @@ if 'cluster_column_name' not in st.session_state:
     st.session_state.cluster_column_name = ''
 if 'auto_clustering' not in st.session_state:
     st.session_state.auto_clustering = False
+if 'cluster_metric_dict' not in st.session_state:
+    st.session_state.cluster_metric_dict = {
+        'Silhouette Score': 'silhouette_score',
+        'Calinski-Harbasz Score': 'calinski_harabasz_score',
+        'Davies-Bouldin Score': 'davies_bouldin_score'
+    }
 
 # Setting up the labeling options
 if 'label_how' not in st.session_state:
@@ -602,8 +608,34 @@ with st.sidebar:
                 main_key=st.session_state.reduction_method
             )
     with st.expander('Cluster', expanded=has_reduction):
-        if st.toggle('Auto Mode', value=st.session_state.auto_clustering):
-            pass
+        if st.toggle(
+            label='Auto Mode',
+            key='_auto_clustering',
+            on_change=strml.update_settings,
+            kwargs={'keys': ['auto_clustering']},
+            value=st.session_state.auto_clustering
+        ):
+            with st.form('Auto clustering', border=False):
+                st.text_input(
+                    label='Cluster column name',
+                    key='auto_cluster_column',
+                    help='What to name the column holding the cluster IDs after \
+                    the algorithm runs.'
+                )
+                st.selectbox(
+                    label='Metric',
+                    index=0,
+                    options=list(st.session_state.cluster_metric_dict.keys()),
+                    key='auto_cluster_metric',
+                    help="Which metric to use for comparing clustering \
+                    algorithms. If you're not sure which one to choose, try \
+                    the default."
+                )
+                if st.form_submit_button('Go'):
+                    strml.run_auto_clustering(
+                        id_str=st.session_state.auto_cluster_column,
+                        metric=st.session_state.auto_cluster_metric,
+                    )
         else:
             st.selectbox(
                 label='Algorithm',
