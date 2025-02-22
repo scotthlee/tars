@@ -290,8 +290,6 @@ if 'cluster_kwargs' not in st.session_state:
     st.session_state.cluster_kwargs = {}
 if 'cluster_column_name' not in st.session_state:
     st.session_state.cluster_column_name = ''
-if 'auto_clustering' not in st.session_state:
-    st.session_state.auto_clustering = False
 if 'cluster_metric_dict' not in st.session_state:
     st.session_state.cluster_metric_dict = {
         'Silhouette Score': 'silhouette_score',
@@ -601,13 +599,14 @@ with st.sidebar:
                 main_key=st.session_state.reduction_method
             )
     with st.expander('Cluster', expanded=has_reduction):
-        if st.toggle(
-            label='Auto Mode',
-            key='_auto_clustering',
-            on_change=strml.update_settings,
-            kwargs={'keys': ['auto_clustering']},
-            value=st.session_state.auto_clustering
-        ):
+        st.segmented_control(
+            label='Clustering Mode',
+            options=['Manual', 'Auto'],
+            key='clustering_mode',
+            default='Manual'
+        )
+        st.divider()
+        if st.session_state.clustering_mode == 'Auto':
             with st.form('Auto clustering', border=False):
                 st.text_input(
                     label='Cluster column name',
