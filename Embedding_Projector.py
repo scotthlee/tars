@@ -70,16 +70,9 @@ st.session_state.gpt_keys = [
 ]
 openai_dict = {
     'chat':{
-        'gpt-35-turbo': {
-            'engine': 'GPT35-Turbo-0613',
-            'url': os.environ['GPT35_URL'],
-            'key': os.environ["OPENAI_API_KEY"],
-            'tokens_in': 16385,
-            'tokens_out': 4096
-        },
         'gpt-4': {
             'engine': 'edav-api-share-gpt4-api-nofilter',
-            'url': os.environ['GPT4_URL'],
+            'url': os.environ['OPENAI_BASE_URL'],
             'key': os.environ["OPENAI_API_KEY"],
             'tokens_in': 128000,
             'tokens_out': 4096
@@ -88,7 +81,7 @@ openai_dict = {
     'embeddings': {
         'ada-002': {
             'engine': 'text-embedding-ada-002',
-            'url': os.environ['GPT4_URL'],
+            'url': os.environ['OPENAI_BASE_URL'],
             'key': os.environ['OPENAI_API_KEY'],
             'type': 'openai',
             'tokens_in': 2048,
@@ -136,9 +129,9 @@ if 'enable_generate_button' not in st.session_state:
     st.session_state.enable_generate_button = False
 
 if 'api_type' not in st.session_state:
-    st.session_state.api_type = 'azure_ad'
+    st.session_state.api_type = os.environ['OPENAI_API_TYPE']
 if 'api_version' not in st.session_state:
-    st.session_state.api_version = '2023-07-01-preview'
+    st.session_state.api_version = os.environ['OPENAI_API_VERSION']
 if 'base_url' not in st.session_state:
     st.session_state.base_url = openai_dict['chat'][st.session_state.chat_model]['url']
 if 'temperature' not in st.session_state:
