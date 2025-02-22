@@ -13,19 +13,23 @@ from tools import oai, data
 
 
 class TextData:
-    def __init__(self,
-                 docs=None,
-                 metadata=None,
-                 embeddings=None):
+    def __init__(
+        self,
+        docs=None,
+        metadata=None,
+        embeddings=None
+    ):
         self.docs = docs
         self.metadata = metadata
         self.embeddings = embeddings
         self.reductions = {}
         self.last_reduction = None
 
-    def embed(self,
-              model_name='ada-002',
-              engine='text-embedding-ada-002'):
+    def embed(
+        self,
+        model_name='ada-002',
+        engine='text-embedding-ada-002'
+    ):
         """Embeds the object's text."""
         if model_name == 'ada-002':
             oai.load_openai_settings(mode='embeddings')
@@ -41,11 +45,13 @@ class TextData:
         self.embeddings = pd.DataFrame(embeddings)
         self.precomputed_knn = data.compute_nn(self.embeddings)
 
-    def reduce(self,
-               method='PCA',
-               dimensions=3,
-               main_kwargs={},
-               aux_kwargs={}):
+    def reduce(
+        self,
+        method='PCA',
+        dimensions=3,
+        main_kwargs={},
+        aux_kwargs={}
+    ):
         """Reduces the dimensionality of the text embeddings using one of
         three methods: PCA, t-SNE, or UMAP. The reduced-dimensionality
         embeddings are stored as a data.EmbeddingReduction() object stored in
@@ -60,12 +66,14 @@ class TextData:
         self.last_reduction = reducer.name
         return
 
-    def cluster(self,
-                reduction,
-                method,
-                id_str=None,
-                main_kwargs={},
-                aux_kwargs={}):
+    def cluster(
+        self,
+        reduction,
+        method,
+        id_str=None,
+        main_kwargs={},
+        aux_kwargs={}
+    ):
         """Runs a clustering algorithm on one of the object's reductions."""
         self.reductions[reduction].cluster(method=method,
                                            id_str=id_str,
@@ -74,16 +82,16 @@ class TextData:
         return
 
     def generate_cluster_keywords(
-            self,
-            reduction,
-            model,
-            docs=None,
-            method='TF-IDF',
-            top_k=10,
-            norm='l1',
-            main_kwargs={},
-            aux_kwargs={}
-        ):
+        self,
+        reduction,
+        model,
+        docs=None,
+        method='TF-IDF',
+        top_k=10,
+        norm='l1',
+        main_kwargs={},
+        aux_kwargs={}
+    ):
         """Names clusters based on the text samples they contain. Uses one of
         two approaches: cluster TF-IDF (the last step of BERTopic), or direct
         labeling with ChatGPT.

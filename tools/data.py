@@ -148,7 +148,7 @@ class ClusterModel:
         top_k=10,
         main_kwargs={},
         aux_kwargs={}
-        ):
+    ):
         """Geneates the to keywords for each cluster."""
         # Merge docs with cluster IDs
         lower_name = self.model_choices[self.model_name]['lower_name']
@@ -245,7 +245,7 @@ class EmbeddingReduction:
         id_str=None,
         main_kwargs={},
         aux_kwargs={}
-        ):
+    ):
         """Adds a ClusterModel to the current reduction."""
         mod = ClusterModel(model_name=method)
         mod.fit(
@@ -324,7 +324,7 @@ class EmbeddingReduction:
         norm='l1',
         main_kwargs={},
         aux_kwargs={}
-        ):
+    ):
         """Names clusters based on the text samples they contain. Uses one of
         two approaches: cluster TF-IDF (the last step of BERTopic), or direct
         labeling with ChatGPT."""
