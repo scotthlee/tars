@@ -330,7 +330,7 @@ if 'plot_height' not in st.session_state:
 if 'marker_size' not in st.session_state:
     st.session_state.marker_size = 3
 if 'marker_opacity' not in st.session_state:
-    st.session_state.marker_opacity = 1.0
+    st.session_state.marker_opacity = 0.6
 if 'show_grid' not in st.session_state:
     st.session_state.show_grid = True
 if 'hover_data' not in st.session_state:
@@ -934,4 +934,6 @@ with st.container(border=True):
         fig.update_traces(marker=dict(size=st.session_state.marker_size))
         fig.update_layout(showlegend=st.session_state.show_legend,
                           hoverlabel=dict(font_size=st.session_state.font_size))
+
+        # Render the main figure
         st.plotly_chart(fig, use_container_width=True)
