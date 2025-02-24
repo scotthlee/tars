@@ -59,9 +59,9 @@ There are a number of ways to [deploy Streamlit apps](https://docs.posit.co/conn
 --server POSIT_CONNECT_SERVER_ADDRESS \
 --api-key YOUR_API_KEY \
 --entrypoint Embedding_Projector.py \
---environment GPT4_URL \
---environment API_TYPE \
---environment API_VERSION \
+--environment OPENAI_BASE_URL \
+--environment OPENAI_API_TYPE \
+--environment OPENAI_API_VERSION \
 --environment SP_TENANT_ID \
 --environment SP_CLIENT_ID \
 --environment SP_CLIENT_SECRET \
@@ -70,7 +70,7 @@ tars/</pre>
 If you'd rather add your environment variables to the app after deployment, you can delete those lines, and if you run into errors with authentication during deployment, you can try adding the `--insecure` flag to the command, although that may not adhere to security best practices. In all cases, you will need an API key for your Posit Connect account (`YOUR_API_KEY` in the example above), and your account will probably need Publisher access to the platform.
 
 ### Notes
-This version of the app requires an Azure Service Principal with access to the Azure OpenAI API. Environment variables should match how they are used in the code, for example, so that `GPT4_URL` is the base URL for the relevant Azure OpenAI model deployments (the app uses `gpt-4-turbo` and `text-embedding-ada-002`), `API_TYPE` is 'azure_ad', `SP_TENANT_ID` is your Service Principal tenant ID, and so on.
+This version of the app requires an Azure Service Principal with access to the Azure OpenAI API. Environment variables should match how they are used in the code, for example, so that `OPENAI_BASE_URL` is the base URL for the relevant Azure OpenAI model deployments (the app uses `gpt-4-turbo` and `text-embedding-ada-002`), `OPENAI_API_TYPE` is 'azure_ad', `SP_TENANT_ID` is your Service Principal tenant ID, and so on.
 
 ## License Standard Notice
 The repository utilizes code licensed under the terms of the Apache Software
