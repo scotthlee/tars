@@ -603,9 +603,9 @@ with st.sidebar:
             label='Clustering Mode',
             options=['Manual', 'Auto'],
             key='clustering_mode',
-            default='Manual'
+            default='Manual',
+            disabled=True
         )
-        st.divider()
         if st.session_state.clustering_mode == 'Auto':
             with st.form('Auto clustering', border=False):
                 st.text_input(
