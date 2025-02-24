@@ -10,10 +10,12 @@ import ast
 import pymupdf
 import openai
 import markdown
+import sklearn
+
+from sklearn import metrics
 
 from tools.data import compute_nn
 from tools.text import TextData
-
 from tools import oai
 
 
@@ -138,12 +140,28 @@ def set_text(col):
         td = TextData(docs=docs, metadata=sf)
         st.session_state.embedding_type_select = text_type
     elif data_type == 'Metadata':
+        # Setting the docs for the current TextData object
         text_type = 'documents'
         td = fetch_td('documents')
         td.docs = docs
-    st.session_state.text_data_dict.update({text_type: td})
+
+        # Running cluster keywords, if any cluster models have been run; this
+        # is super kldugy right now and needs revision
+        if bool(td.reductions):
+            cr = st.session_state.current_reduction
+            label_df = td.reductions[cr].label_df
+            if label_df is not None:
+                id_strs = td.reductions[cr].id_strs
+                with st.spinner('Generating cluster keywords...'):
+                    for i, model in enumerate(td.reductions[cr].cluster_models):
+                        td.reductions[cr].generate_cluster_keywords(
+                            docs=docs,
+                            id_str=id_strs[i],
+                            model=model
+                        )
 
     # Set some other session state variables
+    st.session_state.text_data_dict.update({text_type: td})
     st.session_state.hover_columns = [text_col]
     st.session_state.source_file = sf
     st.session_state.enable_generate_button = True
@@ -215,8 +233,6 @@ def run_clustering():
             model=algo
         )
 
-    # Reset the colum name field
-    st.session_state._cluster_column_name = ''
     return
 
 
@@ -240,7 +256,8 @@ def generate_cluster_keywords():
     td.generate_cluster_keywords(
         reduction=reduction,
         method='TF-IDF',
-        model=model
+        model=model,
+        id_str=st.session_state._cluster_column_name
     )
     return
 
@@ -413,6 +430,14 @@ def reset_defaults(dict, main_key):
         sess_var = lower_name + '_' + k
         st.session_state[sess_var] = v
     return
+
+
+def run_auto_clustering(
+    id_str=None,
+    metric='silhouette_score'
+    ):
+    pass
+
 
 
 @st.dialog('Switch Projection')

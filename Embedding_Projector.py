@@ -18,7 +18,7 @@ from tools import oai, data, text, strml
 
 
 # Setting the "about" section text
-about_text = 'APP_NAME_HERE is a web app, written in Streamlit, for \
+about_text = 'TARS is a Streamlit app for \
 generating and analyzing text embeddings. Broadly, the app recreates \
 the analytic flow of embeddings-based topic-modeling algorithms like \
 BERTopic, allowing users to generate embeddings, reduce their \
@@ -29,7 +29,7 @@ summarization, it can also generate free-text summaries of the \
 information in the clusters. The app makes these summaries, as well as \
 any data artifacts generated during a session, available for download \
 and further analysis offline. \n\n For more information, see the full \
-README at https://github.com/scotthlee/nlp-tool/'
+README at https://github.com/scotthlee/tars/'
 
 # Fire up the page
 st.set_page_config(
@@ -70,16 +70,9 @@ st.session_state.gpt_keys = [
 ]
 openai_dict = {
     'chat':{
-        'gpt-35-turbo': {
-            'engine': 'GPT35-Turbo-0613',
-            'url': os.environ['GPT35_URL'],
-            'key': os.environ["OPENAI_API_KEY"],
-            'tokens_in': 16385,
-            'tokens_out': 4096
-        },
         'gpt-4': {
             'engine': 'edav-api-share-gpt4-api-nofilter',
-            'url': os.environ['GPT4_URL'],
+            'url': os.environ['OPENAI_BASE_URL'],
             'key': os.environ["OPENAI_API_KEY"],
             'tokens_in': 128000,
             'tokens_out': 4096
@@ -88,7 +81,7 @@ openai_dict = {
     'embeddings': {
         'ada-002': {
             'engine': 'text-embedding-ada-002',
-            'url': os.environ['GPT4_URL'],
+            'url': os.environ['OPENAI_BASE_URL'],
             'key': os.environ['OPENAI_API_KEY'],
             'type': 'openai',
             'tokens_in': 2048,
@@ -136,9 +129,9 @@ if 'enable_generate_button' not in st.session_state:
     st.session_state.enable_generate_button = False
 
 if 'api_type' not in st.session_state:
-    st.session_state.api_type = 'azure_ad'
+    st.session_state.api_type = os.environ['OPENAI_API_TYPE']
 if 'api_version' not in st.session_state:
-    st.session_state.api_version = '2023-07-01-preview'
+    st.session_state.api_version = os.environ['OPENAI_API_VERSION']
 if 'base_url' not in st.session_state:
     st.session_state.base_url = openai_dict['chat'][st.session_state.chat_model]['url']
 if 'temperature' not in st.session_state:
@@ -297,6 +290,12 @@ if 'cluster_kwargs' not in st.session_state:
     st.session_state.cluster_kwargs = {}
 if 'cluster_column_name' not in st.session_state:
     st.session_state.cluster_column_name = ''
+if 'cluster_metric_dict' not in st.session_state:
+    st.session_state.cluster_metric_dict = {
+        'Silhouette Score': 'silhouette_score',
+        'Calinski-Harbasz Score': 'calinski_harabasz_score',
+        'Davies-Bouldin Score': 'davies_bouldin_score'
+    }
 
 # Setting up the labeling options
 if 'label_how' not in st.session_state:
@@ -331,7 +330,7 @@ if 'plot_height' not in st.session_state:
 if 'marker_size' not in st.session_state:
     st.session_state.marker_size = 3
 if 'marker_opacity' not in st.session_state:
-    st.session_state.marker_opacity = 1.0
+    st.session_state.marker_opacity = 0.6
 if 'show_grid' not in st.session_state:
     st.session_state.show_grid = True
 if 'hover_data' not in st.session_state:
@@ -600,123 +599,154 @@ with st.sidebar:
                 main_key=st.session_state.reduction_method
             )
     with st.expander('Cluster', expanded=has_reduction):
-        st.selectbox(
-            label='Algorithm',
-            options=list(cluster_dict.keys()),
-            key='_clustering_algorithm',
-            index=None,
-            placeholder=st.session_state.clustering_algorithm,
-            on_change=strml.update_settings,
-            kwargs={'keys': ['clustering_algorithm']},
-            help='The algorithm to use for grouping the embeddings \
-            into clusters.'
+        st.segmented_control(
+            label='Clustering Mode',
+            options=['Manual', 'Auto'],
+            key='clustering_mode',
+            default='Manual',
+            disabled=True
         )
-        current_algorithm = st.session_state.clustering_algorithm
-        default_name = cluster_dict[current_algorithm]['lower_name']
-        with st.form(key='_cluster_param_form', border=False):
-            if current_algorithm == 'DBSCAN':
-                st.number_input(
-                    label='Epsilon',
-                    min_value=0.001,
-                    max_value=10.0,
-                    value=st.session_state.dbscan_eps,
-                    key='_dbscan_eps',
-                    help='The maximum distance between two samples for one \
-                    to be considered as in the neighborhood of the other.'
+        if st.session_state.clustering_mode == 'Auto':
+            with st.form('Auto clustering', border=False):
+                st.text_input(
+                    label='Cluster column name',
+                    key='auto_cluster_column',
+                    help='What to name the column holding the cluster IDs after \
+                    the algorithm runs.'
                 )
-                st.number_input(
-                    label='Minimum samples',
-                    min_value=1,
-                    max_value=100,
-                    value=st.session_state.dbscan_min_samples,
-                    key='_dbscan_min_samples',
-                    help='The number of samples in a neighborhood for a \
-                    point to be considered as a core point. At higher \
-                    values, the algorithm will find denser clusters, and \
-                    at lower values, the clusters will be more sparser.'
-                )
-            elif current_algorithm == 'HDBSCAN':
-                st.number_input(
-                    label='Minimum cluster size',
-                    min_value=2,
-                    max_value=1000,
-                    key='_hdbscan_min_cluster_size',
-                    value=st.session_state.hdbscan_min_cluster_size,
-                    help='The minimum number of samples in a group for the \
-                    group to be considered a cluster. Groupings smaller than \
-                    this size will be left as noise.'
-                )
-                st.number_input(
-                    label='Minimum samples',
-                    min_value=1,
-                    max_value=1000,
-                    key='_hdbscan_min_samples',
-                    value=st.session_state.hdbscan_min_samples,
-                    help='The parameter k used to calculate the distance \
-                    between a point x_p and its k-th nearest neighbor. When \
-                    None, defaults to the minimum cluster size.'
-                )
-            elif current_algorithm == 'k-means':
-                st.number_input(
-                    label='Number of clusters',
-                    min_value=1,
-                    max_value=100,
-                    key='_kmeans_n_clusters',
-                    value=st.session_state.kmeans_n_clusters,
-                    help='The number of clusters to form, as well as the number\
-                    of centroids to generate.'
-                )
-                st.number_input(
-                    label='Max iterations',
-                    min_value=1,
-                    max_value=500,
-                    key='_kmeans_max_iter',
-                    value=st.session_state.kmeans_max_iter,
-                    help='The maximum number of iterations for the algorithm \
-                    to run.'
-                )
-            elif current_algorithm == 'Agglomerative':
                 st.selectbox(
                     label='Metric',
-                    options=['euclidean', 'l1', 'l2', 'manhattan', 'cosine'],
-                    key='_aggl_metric',
-                    index=None,
-                    placeholder=st.session_state.aggl_metric,
-                    kwargs={'keys': ['aggl_metric']}
+                    index=0,
+                    options=list(st.session_state.cluster_metric_dict.keys()),
+                    key='auto_cluster_metric',
+                    help="Which metric to use for comparing clustering \
+                    algorithms. If you're not sure which one to choose, try \
+                    the default."
                 )
-            st.text_input(
-                label='Cluster column name',
-                key='_cluster_column_name',
-                value=cluster_dict[current_algorithm]['lower_name'] + '_id',
-                help='What to name the column holding the cluster IDs after \
-                the algorithm runs.'
+                if st.form_submit_button('Go'):
+                    strml.run_auto_clustering(
+                        id_str=st.session_state.auto_cluster_column,
+                        metric=st.session_state.auto_cluster_metric,
+                    )
+        else:
+            st.selectbox(
+                label='Algorithm',
+                options=list(cluster_dict.keys()),
+                key='_clustering_algorithm',
+                index=None,
+                placeholder=st.session_state.clustering_algorithm,
+                on_change=strml.update_settings,
+                kwargs={'keys': ['clustering_algorithm']},
+                help='The algorithm to use for grouping the embeddings \
+                into clusters.'
             )
-            st.text_input(
-                label='Keyword arguments',
-                key='_cluster_kwargs',
-                value=st.session_state.cluster_kwargs,
-                kwargs={'keys': ['cluster_kwargs']},
-                help="Extra arguments to pass to the scikit-learn \
-                clustering model. Should be formatted as a Python \
-                dictionary, e.g., {'kw': kw_value}. Note: the app will \
-                not check whether these are correct before attempting \
-                to run the algorithm, so incorrect entries may crash the \
-                current session."
-            )
-            st.form_submit_button(
-                label='Run algorithm',
-                on_click=strml.run_clustering,
-                disabled=not has_reduction
-            )
-        if st.button(
-            label='Reset Default Values',
-            disabled=not has_reduction,
-            key='reset_clustering'
-        ):
-            strml.reset_defaults(
-                dict=st.session_state.cluster_dict,
-                main_key=current_algorithm
-            )
+            current_algorithm = st.session_state.clustering_algorithm
+            default_name = cluster_dict[current_algorithm]['lower_name']
+            with st.form(key='_cluster_param_form', border=False):
+                if current_algorithm == 'DBSCAN':
+                    st.number_input(
+                        label='Epsilon',
+                        min_value=0.001,
+                        max_value=10.0,
+                        value=st.session_state.dbscan_eps,
+                        key='_dbscan_eps',
+                        help='The maximum distance between two samples for one \
+                        to be considered as in the neighborhood of the other.'
+                    )
+                    st.number_input(
+                        label='Minimum samples',
+                        min_value=1,
+                        max_value=100,
+                        value=st.session_state.dbscan_min_samples,
+                        key='_dbscan_min_samples',
+                        help='The number of samples in a neighborhood for a \
+                        point to be considered as a core point. At higher \
+                        values, the algorithm will find denser clusters, and \
+                        at lower values, the clusters will be more sparser.'
+                    )
+                elif current_algorithm == 'HDBSCAN':
+                    st.number_input(
+                        label='Minimum cluster size',
+                        min_value=2,
+                        max_value=1000,
+                        key='_hdbscan_min_cluster_size',
+                        value=st.session_state.hdbscan_min_cluster_size,
+                        help='The minimum number of samples in a group for the \
+                        group to be considered a cluster. Groupings smaller than \
+                        this size will be left as noise.'
+                    )
+                    st.number_input(
+                        label='Minimum samples',
+                        min_value=1,
+                        max_value=1000,
+                        key='_hdbscan_min_samples',
+                        value=st.session_state.hdbscan_min_samples,
+                        help='The parameter k used to calculate the distance \
+                        between a point x_p and its k-th nearest neighbor. When \
+                        None, defaults to the minimum cluster size.'
+                    )
+                elif current_algorithm == 'k-means':
+                    st.number_input(
+                        label='Number of clusters',
+                        min_value=1,
+                        max_value=100,
+                        key='_kmeans_n_clusters',
+                        value=st.session_state.kmeans_n_clusters,
+                        help='The number of clusters to form, as well as the number\
+                        of centroids to generate.'
+                    )
+                    st.number_input(
+                        label='Max iterations',
+                        min_value=1,
+                        max_value=500,
+                        key='_kmeans_max_iter',
+                        value=st.session_state.kmeans_max_iter,
+                        help='The maximum number of iterations for the algorithm \
+                        to run.'
+                    )
+                elif current_algorithm == 'Agglomerative':
+                    st.selectbox(
+                        label='Metric',
+                        options=['euclidean', 'l1', 'l2', 'manhattan', 'cosine'],
+                        key='_aggl_metric',
+                        index=None,
+                        placeholder=st.session_state.aggl_metric,
+                        kwargs={'keys': ['aggl_metric']}
+                    )
+                st.text_input(
+                    label='Cluster column name',
+                    key='_cluster_column_name',
+                    value=cluster_dict[current_algorithm]['lower_name'] + '_id',
+                    help='What to name the column holding the cluster IDs after \
+                    the algorithm runs.'
+                )
+                st.text_input(
+                    label='Keyword arguments',
+                    key='_cluster_kwargs',
+                    value=st.session_state.cluster_kwargs,
+                    kwargs={'keys': ['cluster_kwargs']},
+                    help="Extra arguments to pass to the scikit-learn \
+                    clustering model. Should be formatted as a Python \
+                    dictionary, e.g., {'kw': kw_value}. Note: the app will \
+                    not check whether these are correct before attempting \
+                    to run the algorithm, so incorrect entries may crash the \
+                    current session."
+                )
+                if st.form_submit_button(
+                    label='Run algorithm',
+                    disabled=not has_reduction
+                ):
+                    strml.run_clustering()
+                    st.rerun()
+            if st.button(
+                label='Reset Default Values',
+                disabled=not has_reduction,
+                key='reset_clustering'
+            ):
+                strml.reset_defaults(
+                    dict=st.session_state.cluster_dict,
+                    main_key=current_algorithm
+                )
     with st.expander('Plot', expanded=has_reduction):
         if has_reduction:
             if (has_metadata) or (has_clusters):
@@ -886,8 +916,7 @@ with st.container(border=True):
             cluster_cols = current_reduc.label_df.columns.values
             display_data[cluster_cols] = current_reduc.label_df.values
         if has_metadata:
-            display_data = pd.concat([display_data, td.metadata],
-                                     axis=1)
+            display_data = pd.concat([display_data, td.metadata], axis=1)
         if st.session_state.map_in_3d:
             fig = px.scatter_3d(data_frame=display_data,
                                 x='d1', y='d2', z='d3',
@@ -905,4 +934,6 @@ with st.container(border=True):
         fig.update_traces(marker=dict(size=st.session_state.marker_size))
         fig.update_layout(showlegend=st.session_state.show_legend,
                           hoverlabel=dict(font_size=st.session_state.font_size))
+
+        # Render the main figure
         st.plotly_chart(fig, use_container_width=True)
