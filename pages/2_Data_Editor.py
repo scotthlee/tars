@@ -124,6 +124,7 @@ if has_data:
 
         # Form for choosing which columns to display
         with st.sidebar:
+            st.subheader('Edit')
             with st.expander('Show or Hide', expanded=False):
                 st.multiselect(
                     label='Columns to Show',
@@ -208,16 +209,17 @@ if has_data:
                     help='Only rows with this value of your chosen filter \
                     column will be shown.'
                 )
-            with st.expander('Options', expanded=False):
-                st.number_input(
-                    label='Viewer Height',
-                    key='_data_editor_height',
-                    value=st.session_state.data_editor_height,
-                    on_change=strml.update_settings,
-                    kwargs={'keys': ['data_editor_height'], 'toast': False},
-                    help='How tall the data viewer to the right should be, \
-                    measured in pixels.'
-                )
+            st.divider()
+            st.subheader('Options')
+            st.number_input(
+                label='Viewer Height',
+                key='_data_editor_height',
+                value=st.session_state.data_editor_height,
+                on_change=strml.update_settings,
+                kwargs={'keys': ['data_editor_height'], 'toast': False},
+                help='How tall the data viewer to the right should be, \
+                measured in pixels.'
+            )
 
         # Render the dataframe, hiding the dim redux columns to avoid botching
         # the current projection
