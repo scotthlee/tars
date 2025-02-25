@@ -92,7 +92,7 @@ openai_dict = {
 openai_defaults = {
     'chat': {
         'model': 'gpt-4',
-        'engine': 'edav-api-share-gpt4-api-nofilter',
+        'engine': os.environ['OPENAI_GPT_DEPLOYMENT'],
         'max_tokens': None,
         'top_p': 0.95,
         'temperature': 0.20,
