@@ -1,10 +1,10 @@
 azure-core==1.29.6
 azure-identity==1.16.1
-azure_storage==0.37.0
 Markdown==3.7
 matplotlib==3.8.4
 numpy==2.2.2
 openai==0.28.0
+openpyxl
 pandas==2.2.3
 plotly==5.24.1
 pymupdf==1.25.3
