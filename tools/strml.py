@@ -151,13 +151,12 @@ def set_text(col):
             cr = st.session_state.current_reduction
             label_df = td.reductions[cr].label_df
             if label_df is not None:
-                id_strs = td.reductions[cr].id_strs
+                id_strs = list(td.reductions[cr].cluster_models.keys())
                 with st.spinner('Generating cluster keywords...'):
-                    for i, model in enumerate(td.reductions[cr].cluster_models):
+                    for id_str in id_strs:
                         td.reductions[cr].generate_cluster_keywords(
                             docs=docs,
-                            id_str=id_strs[i],
-                            model=model
+                            id_str=id_strs[i]
                         )
 
     # Set some other session state variables
@@ -230,7 +229,7 @@ def run_clustering():
     if td.docs is not None:
         td.generate_cluster_keywords(
             reduction=st.session_state.current_reduction,
-            model=algo
+            id_str=col_name
         )
 
     return
@@ -269,14 +268,15 @@ def generate_report():
     # Load API settings
     oai.load_openai_settings(mode='chat')
 
-    # Prep the individual cluster samples
-    id_col = st.session_state.summary_cluster_choice.replace('_id', '')
-    cd = st.session_state.cluster_dict
-    algo = [k for k in list(cd.keys()) if cd[k]['lower_name'] == id_col][0]
-    samp_size = int(st.session_state.summary_n_samples)
+    # Fetch the correct cluster model
     td = fetch_td(st.session_state.embedding_type_select)
     reduction = st.session_state.current_reduction
-    cm = td.reductions[reduction].cluster_models[algo]
+    id_col = st.session_state.summary_cluster_choice
+    cm = td.reductions[reduction].cluster_models[id_col]
+    alg = cm.model_name
+
+    # Prep the individual cluster samples
+    samp_size = int(st.session_state.summary_n_samples)
     docs = td.docs
     doc_samps = cm.sample_docs(docs=docs, max_count=samp_size)
     cluster_ids = list(doc_samps.keys())
@@ -437,7 +437,6 @@ def run_auto_clustering(
     metric='silhouette_score'
     ):
     pass
-
 
 
 @st.dialog('Switch Projection')

@@ -199,7 +199,7 @@ class ClusterModel:
         if self.labels is not None:
             algo = self.model_name
             lower_name = self.model_choices[algo]['lower_name']
-            id_str = lower_name + '_id'
+            id_str = self.id_str
             ids = self.labels[id_str].unique()
             out = {}
             for id in ids:
@@ -235,7 +235,6 @@ class EmbeddingReduction:
         self.label_df = None
         self.id_strs = []
         self.cluster_models = {}
-        self.cluster_names = {}
         self.doc_samples = {}
         self.cluster_scores = {}
 
@@ -254,15 +253,8 @@ class EmbeddingReduction:
             main_kwargs=main_kwargs,
             aux_kwargs=aux_kwargs
         )
-        self.id_strs.append(mod.id_str)
-        mod_name = mod.model_name
-        current_models = self.cluster_models.keys()
-        mod_count = sum([mod_name in s for s in current_models])
-        if mod_count > 0:
-            mod_name += '_' + str(mod_count)
-
-        self.cluster_models.update({mod_name: mod})
-        self.cluster_scores.update(mod.scores)
+        self.cluster_models.update({mod.id_str: mod})
+        self.cluster_scores.update({mod.id_str: mod.scores})
         if self.label_df is None:
             self.label_df = mod.labels
         else:
@@ -317,7 +309,6 @@ class EmbeddingReduction:
     def generate_cluster_keywords(
         self,
         docs,
-        model,
         id_str=None,
         method='TF-IDF',
         top_k=10,
@@ -328,7 +319,7 @@ class EmbeddingReduction:
         """Names clusters based on the text samples they contain. Uses one of
         two approaches: cluster TF-IDF (the last step of BERTopic), or direct
         labeling with ChatGPT."""
-        self.cluster_models[model].generate_keywords(
+        self.cluster_models[id_str].generate_keywords(
             method=method,
             id_str=id_str,
             top_k=top_k,
@@ -338,11 +329,11 @@ class EmbeddingReduction:
             aux_kwargs=aux_kwargs
         )
 
-    def sample_docs(self, model, docs, max_count=20, min_count=5):
+    def sample_docs(self, id_str, docs, max_count=20, min_count=5):
         """Randomly samples documents from each cluster given by the specified
         clustering model.
         """
-        doc_samples = self.cluster_models[model].sample_docs(
+        doc_samples = self.cluster_models[id_str].sample_docs(
             docs=docs,
             ax_count=max_count,
             min_count=min_count

@@ -84,7 +84,7 @@ class TextData:
     def generate_cluster_keywords(
         self,
         reduction,
-        model,
+        id_str,
         docs=None,
         method='TF-IDF',
         top_k=10,
@@ -99,7 +99,7 @@ class TextData:
         if docs is None:
             docs = self.docs
         self.reductions[reduction].generate_cluster_keywords(
-            model=model,
+            id_str=id_str,
             method=method,
             top_k=top_k,
             norm=norm,
