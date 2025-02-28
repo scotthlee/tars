@@ -422,10 +422,8 @@ with st.sidebar:
             st.selectbox(
                 'Text Column',
                 key='_text_column',
-                index=st.session_state.text_column,
                 options=st.session_state.source_file.columns.values,
                 on_change=strml.set_text,
-                kwargs={'col': 'text_column'},
                 help="Choose the column in your dataset holding the \
                 text you'd like to embed."
             )
@@ -496,10 +494,8 @@ with st.sidebar:
                     st.selectbox(
                         'Text Column',
                         key='_text_column',
-                        index=st.session_state.text_column,
                         options=st.session_state.source_file.columns.values,
                         on_change=strml.set_text,
-                        kwargs={'col': 'text_column'},
                         help="Choose the column in your dataset holding the \
                         text you'd like to embed."
                     )

@@ -5,6 +5,7 @@ import streamlit as st
 import io
 import openai
 import spacy
+import tiktoken
 
 from matplotlib import pyplot as plt
 from multiprocessing import Pool
@@ -75,10 +76,12 @@ class TextData:
         aux_kwargs={}
     ):
         """Runs a clustering algorithm on one of the object's reductions."""
-        self.reductions[reduction].cluster(method=method,
-                                           id_str=id_str,
-                                           main_kwargs=main_kwargs,
-                                           aux_kwargs=aux_kwargs)
+        self.reductions[reduction].cluster(
+            method=method,
+            id_str=id_str,
+            main_kwargs=main_kwargs,
+            aux_kwargs=aux_kwargs
+        )
         return
 
     def generate_cluster_keywords(
@@ -129,3 +132,33 @@ def average_embeddings(embeddings, weights=None, axis=0):
     if weights is not None:
         embeddings = embeddings * weights
     return np.sum(embeddings) / embeddings.shape[axis]
+
+
+def docs_to_tokens(docs, scheme='cl100k_base'):
+    """Converts a list of text chunks to a list of lists of tokens."""
+    enc = tiktoken.get_encoding(scheme)
+    encodings = [enc.encode(str(d)) for d in docs]
+    return encodings
+
+
+def tokens_to_docs(encodings, scheme='cl100k_base'):
+    """Converts a list of tiktoken encodings back to their original text
+    strings."""
+    enc = tiktoken.get_encoding(scheme)
+    docs = [enc.decode(l) for l in encodings]
+    return docs
+
+
+def truncate_text(docs, max_length, scheme='cl100k_base'):
+    """Clips documents so that they don't exceed a given model's context
+    window. Mainly for use with embedding models.
+    """
+    encodings = docs_to_tokens(docs, scheme)
+    trimmed_encodings = [l[:max_length] for l in encodings]
+    trimmed_text = tokens_to_docs(trimmed_encodings, scheme)
+    return trimmed_text
+
+
+def split_list(lst, n):
+    """Splits a list into sublists of size n."""
+    return [lst[i:i + n] for i in range(0, len(lst), n)]

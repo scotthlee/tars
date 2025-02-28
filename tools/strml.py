@@ -123,12 +123,15 @@ def fetch_td(td_name):
     return st.session_state.text_data_dict[td_name]
 
 
-def set_text(col):
+def set_text():
     """Adds the text to be embedded to the session state. Only applies when
     tabular data is used for the input.
     """
+    # Set the text column in the session state
+    update_settings(['text_column'])
+    text_col = st.session_state.text_column
+
     # Pull the text from the metadata file and prep
-    text_col = st.session_state['_' + col]
     sf = st.session_state.source_file.dropna(axis=0, subset=text_col)
     sf[text_col] = sf[text_col].astype(str)
     docs = [str(d) for d in sf[text_col]]
@@ -156,7 +159,7 @@ def set_text(col):
                     for id_str in id_strs:
                         td.reductions[cr].generate_cluster_keywords(
                             docs=docs,
-                            id_str=id_strs[i]
+                            id_str=id_str
                         )
 
     # Set some other session state variables
@@ -241,7 +244,6 @@ def switch_reduction():
     the main plot.
     """
     update_settings(['current_reduction'])
-    st.session_state.color_column = None
     return
 
 
@@ -458,6 +460,8 @@ def switch_projection():
             for k in list(st.session_state.hover_data.keys())
             if '_id' not in k
         }
+        st.session_state.color_column = None
+        st.session_state.hover_columns = None
         st.session_state.embedding_type_select = emb_select
         st.session_state.current_reduction = reduc_select
         st.rerun()
