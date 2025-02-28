@@ -188,6 +188,11 @@ reduction_dict = {
             'learning_rate': 1000.0,
             'n_iter': 1000
         }
+    },
+    'PCA': {
+        'lower_name': 'pca',
+        'params': [],
+        'defaults': {}
     }
 }
 
@@ -529,7 +534,6 @@ with st.sidebar:
             label='Method',
             options=['UMAP', 't-SNE', 'PCA'],
             key='_reduction_method',
-            placeholder=st.session_state.reduction_method,
             on_change=strml.update_settings,
             kwargs={'keys': ['reduction_method']},
             help='The algorithm used to reduce the dimensionality \
