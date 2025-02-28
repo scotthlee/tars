@@ -34,13 +34,37 @@ class TextData:
         """Embeds the object's text."""
         if model_name == 'ada-002':
             oai.load_openai_settings(mode='embeddings')
+
+            # Truncating long documents to match the API limits
+            token_limit = st.session_state.openai_dict['embeddings']['ada-002']['tokens_in']
+            self.docs = truncate_text(self.docs, max_length=token_limit)
+            st.write(len(self.docs))
+
+            # Split long sets of documents into medium-sized chunks so the API
+            # doesn't explode
+            if len(self.docs) > 2000:
+                doc_list = split_list(self.docs, n=2000)
+            else:
+                doc_list = [self.docs]
+            embedding_list = []
             with st.spinner('Fetching the embeddings...'):
-                response = openai.Embedding.create(
-                    input=self.docs,
-                    engine=engine,
-                )
-            embeddings = np.array([response['data'][i]['embedding']
-                      for i in range(len(self.docs))])
+                for docs in doc_list:
+                    st.write(len(docs))
+                    st.write(docs[0])
+                    try:
+                        response = openai.Embedding.create(
+                            input=docs,
+                            engine=engine,
+                        )
+                        embedding_list.append(
+                            np.array([
+                                 response['data'][i]['embedding']
+                                 for i in range(len(docs))
+                            ])
+                        )
+                    except:
+                        st.warning('API error.')
+                embeddings = np.concatenate(embedding_list, axis=0)
         elif model_type == 'huggingface':
             pass
         self.embeddings = pd.DataFrame(embeddings)
@@ -154,7 +178,12 @@ def truncate_text(docs, max_length, scheme='cl100k_base'):
     window. Mainly for use with embedding models.
     """
     encodings = docs_to_tokens(docs, scheme)
-    trimmed_encodings = [l[:max_length] for l in encodings]
+    trimmed_encodings = []
+    for e in encodings:
+        if len(e) > max_length:
+            trimmed_encodings.append(e[:max_length])
+        else:
+            trimmed_encodings.append(e)
     trimmed_text = tokens_to_docs(trimmed_encodings, scheme)
     return trimmed_text
 

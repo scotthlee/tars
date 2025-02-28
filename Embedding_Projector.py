@@ -84,7 +84,7 @@ openai_dict = {
             'url': os.environ['OPENAI_BASE_URL'],
             'key': os.environ['OPENAI_API_KEY'],
             'type': 'openai',
-            'tokens_in': 2048,
+            'tokens_in': 8192,
             'document_limit': None
         }
     }
@@ -494,6 +494,7 @@ with st.sidebar:
                     st.selectbox(
                         'Text Column',
                         key='_text_column',
+                        index=None,
                         options=st.session_state.source_file.columns.values,
                         on_change=strml.set_text,
                         help="Choose the column in your dataset holding the \
