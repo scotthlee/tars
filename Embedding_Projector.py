@@ -84,7 +84,8 @@ openai_dict = {
             'url': os.environ['OPENAI_BASE_URL'],
             'key': os.environ['OPENAI_API_KEY'],
             'type': 'openai',
-            'tokens_in': 2048,
+            'tokens_in': 8192,
+            'tpm_limit': 120000,
             'document_limit': None
         }
     }
@@ -188,6 +189,11 @@ reduction_dict = {
             'learning_rate': 1000.0,
             'n_iter': 1000
         }
+    },
+    'PCA': {
+        'lower_name': 'pca',
+        'params': [],
+        'defaults': {}
     }
 }
 
@@ -417,10 +423,8 @@ with st.sidebar:
             st.selectbox(
                 'Text Column',
                 key='_text_column',
-                index=st.session_state.text_column,
                 options=st.session_state.source_file.columns.values,
                 on_change=strml.set_text,
-                kwargs={'col': 'text_column'},
                 help="Choose the column in your dataset holding the \
                 text you'd like to embed."
             )
@@ -491,10 +495,9 @@ with st.sidebar:
                     st.selectbox(
                         'Text Column',
                         key='_text_column',
-                        index=st.session_state.text_column,
+                        index=None,
                         options=st.session_state.source_file.columns.values,
                         on_change=strml.set_text,
-                        kwargs={'col': 'text_column'},
                         help="Choose the column in your dataset holding the \
                         text you'd like to embed."
                     )
@@ -529,7 +532,6 @@ with st.sidebar:
             label='Method',
             options=['UMAP', 't-SNE', 'PCA'],
             key='_reduction_method',
-            placeholder=st.session_state.reduction_method,
             on_change=strml.update_settings,
             kwargs={'keys': ['reduction_method']},
             help='The algorithm used to reduce the dimensionality \

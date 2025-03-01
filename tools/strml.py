@@ -123,47 +123,49 @@ def fetch_td(td_name):
     return st.session_state.text_data_dict[td_name]
 
 
-def set_text(col):
+def set_text():
     """Adds the text to be embedded to the session state. Only applies when
     tabular data is used for the input.
     """
-    # Pull the text from the metadata file and prep
-    text_col = st.session_state['_' + col]
-    sf = st.session_state.source_file.dropna(axis=0, subset=text_col)
-    sf[text_col] = sf[text_col].astype(str)
-    docs = [str(d) for d in sf[text_col]]
+    # Set the text column in the session state
+    update_settings(['text_column'])
+    text_col = st.session_state.text_column
+    if text_col is not None:
+        # Pull the text from the metadata file and prep
+        sf = st.session_state.source_file.dropna(axis=0, subset=text_col)
+        docs = [str(d) for d in sf[text_col]]
 
-    # Create a new TextData object with the text as its docs
-    data_type = st.session_state.data_type
-    if data_type == 'Tabular data with text column':
-        text_type = st.session_state.embedding_type
-        td = TextData(docs=docs, metadata=sf)
-        st.session_state.embedding_type_select = text_type
-    elif data_type == 'Metadata':
-        # Setting the docs for the current TextData object
-        text_type = 'documents'
-        td = fetch_td('documents')
-        td.docs = docs
+        # Create a new TextData object with the text as its docs
+        data_type = st.session_state.data_type
+        if data_type == 'Tabular data with text column':
+            text_type = st.session_state.embedding_type
+            td = TextData(docs=docs, metadata=sf)
+            st.session_state.embedding_type_select = text_type
+        elif data_type == 'Metadata':
+            # Setting the docs for the current TextData object
+            text_type = 'documents'
+            td = fetch_td('documents')
+            td.docs = docs
 
-        # Running cluster keywords, if any cluster models have been run; this
-        # is super kldugy right now and needs revision
-        if bool(td.reductions):
-            cr = st.session_state.current_reduction
-            label_df = td.reductions[cr].label_df
-            if label_df is not None:
-                id_strs = list(td.reductions[cr].cluster_models.keys())
-                with st.spinner('Generating cluster keywords...'):
-                    for id_str in id_strs:
-                        td.reductions[cr].generate_cluster_keywords(
-                            docs=docs,
-                            id_str=id_strs[i]
-                        )
+            # Running cluster keywords, if any cluster models have been run; this
+            # is super kldugy right now and needs revision
+            if bool(td.reductions):
+                cr = st.session_state.current_reduction
+                label_df = td.reductions[cr].label_df
+                if label_df is not None:
+                    id_strs = list(td.reductions[cr].cluster_models.keys())
+                    with st.spinner('Generating cluster keywords...'):
+                        for id_str in id_strs:
+                            td.reductions[cr].generate_cluster_keywords(
+                                docs=docs,
+                                id_str=id_str
+                            )
 
-    # Set some other session state variables
-    st.session_state.text_data_dict.update({text_type: td})
-    st.session_state.hover_columns = [text_col]
-    st.session_state.source_file = sf
-    st.session_state.enable_generate_button = True
+        # Set some other session state variables
+        st.session_state.text_data_dict.update({text_type: td})
+        st.session_state.hover_columns = [text_col]
+        st.session_state.source_file = sf
+        st.session_state.enable_generate_button = True
     return
 
 
@@ -241,7 +243,6 @@ def switch_reduction():
     the main plot.
     """
     update_settings(['current_reduction'])
-    st.session_state.color_column = None
     return
 
 
@@ -458,6 +459,8 @@ def switch_projection():
             for k in list(st.session_state.hover_data.keys())
             if '_id' not in k
         }
+        st.session_state.color_column = None
+        st.session_state.hover_columns = None
         st.session_state.embedding_type_select = emb_select
         st.session_state.current_reduction = reduc_select
         st.rerun()
