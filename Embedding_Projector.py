@@ -85,6 +85,7 @@ openai_dict = {
             'key': os.environ['OPENAI_API_KEY'],
             'type': 'openai',
             'tokens_in': 8192,
+            'tpm_limit': 120000,
             'document_limit': None
         }
     }
