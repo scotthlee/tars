@@ -188,6 +188,26 @@ def truncate_text(docs, max_length, scheme='cl100k_base'):
     return trimmed_text
 
 
+def chunk_to_tpm(docs, max_length=8192, tpm=120000, scheme='cl100k_base'):
+    """Breaks a list of documents into chunks to avoid triggering API TPM
+    limits.
+    """
+    docs = truncate_text(docs, max_length=max_length, scheme=scheme)
+    doc_tokens = docs_to_tokens(docs, scheme=scheme)
+    doc_blocks = []
+    curr_block = []
+    block_length = 0
+    for block_num, doc in enumerate(docs):
+        block_length += len(doc)
+        if block_length < tpm:
+            curr_block.append(doc)
+        else:
+            doc_blocks.append(curr_block)
+            block_length = 0
+            curr_block = []
+    return doc_blocks
+
+
 def split_list(lst, n):
     """Splits a list into sublists of size n."""
     return [lst[i:i + n] for i in range(0, len(lst), n)]
