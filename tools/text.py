@@ -9,6 +9,7 @@ import tiktoken
 
 from matplotlib import pyplot as plt
 from multiprocessing import Pool
+from sentence_transformers import SentenceTransformer
 
 from tools import oai, data
 
@@ -35,38 +36,33 @@ class TextData:
         if model_name == 'ada-002':
             oai.load_openai_settings(mode='embeddings')
 
-            # Truncating long documents to match the API limits
-            token_limit = st.session_state.openai_dict['embeddings']['ada-002']['tokens_in']
-            self.docs = truncate_text(self.docs, max_length=token_limit)
-            st.write(len(self.docs))
-
             # Split long sets of documents into medium-sized chunks so the API
             # doesn't explode
-            if len(self.docs) > 2000:
-                doc_list = split_list(self.docs, n=2000)
-            else:
-                doc_list = [self.docs]
+            doc_blocks = chunk_to_tpm(self.docs)
             embedding_list = []
-            with st.spinner('Fetching the embeddings...'):
-                for docs in doc_list:
-                    st.write(len(docs))
-                    st.write(docs[0])
+
+            # Fetch the embeddings for each batch
+            with st.spinner('Generating the embeddings...'):
+                for block_num, doc_block in enumerate(doc_blocks):
                     try:
                         response = openai.Embedding.create(
-                            input=docs,
+                            input=doc_block,
                             engine=engine,
                         )
                         embedding_list.append(
                             np.array([
                                  response['data'][i]['embedding']
-                                 for i in range(len(docs))
+                                 for i in range(len(doc_block))
                             ])
                         )
                     except:
                         st.warning('API error.')
                 embeddings = np.concatenate(embedding_list, axis=0)
-        elif model_type == 'huggingface':
-            pass
+        elif model_name == 'all-MiniLM-L6-v2':
+            with st.spinner('Generating the embeddings...'):
+                mod = SentenceTransformer('all-MiniLM-L6-v2')
+                embeddings = mod.encode(self.docs)
+
         self.embeddings = pd.DataFrame(embeddings)
         self.precomputed_knn = data.compute_nn(self.embeddings)
 
