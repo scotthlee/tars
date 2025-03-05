@@ -188,25 +188,33 @@ def truncate_text(docs, max_length, scheme='cl100k_base'):
     return trimmed_text
 
 
-def chunk_to_tpm(docs, max_length=8192, tpm=120000, scheme='cl100k_base'):
+def chunk_to_tpm(
+    docs,
+    max_docs=2000,
+    max_doc_length=8192,
+    tpm=120000,
+    scheme='cl100k_base'
+    ):
     """Breaks a list of documents into chunks to avoid triggering API TPM
     limits.
     """
-    docs = truncate_text(docs, max_length=max_length, scheme=scheme)
+    docs = truncate_text(docs, max_length=max_doc_length, scheme=scheme)
     doc_tokens = docs_to_tokens(docs, scheme=scheme)
     doc_blocks = []
     curr_block = []
     block_length = 0
-    for block_num, doc in enumerate(docs):
-        block_length += len(doc)
-        if block_length < tpm:
+    for doc_num, doc in enumerate(docs):
+        block_length += len(doc_tokens[doc_num])
+        if (block_length <= tpm) and (len(curr_block) < max_docs):
             curr_block.append(doc)
         else:
             doc_blocks.append(curr_block)
-            block_length = 0
-            curr_block = []
-    return doc_blocks
+            block_length = len(doc_tokens[doc_num])
+            curr_block = [doc]
+    if curr_block:
+        doc_blocks.append(curr_block)
 
+    return doc_blocks
 
 def split_list(lst, n):
     """Splits a list into sublists of size n."""
