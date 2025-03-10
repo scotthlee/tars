@@ -6,6 +6,8 @@ import io
 import openai
 import spacy
 import tiktoken
+import threading
+import time
 
 from matplotlib import pyplot as plt
 from multiprocessing import Pool
@@ -49,14 +51,15 @@ class TextData:
                             input=doc_block,
                             engine=engine,
                         )
+                        st.write('received')
                         embedding_list.append(
                             np.array([
                                  response['data'][i]['embedding']
                                  for i in range(len(doc_block))
                             ])
                         )
-                    except:
-                        st.warning('API error.')
+                    except openai.APIError as e:
+                        st.write(f"OpenAI API returned an API Error: {e}")
                 embeddings = np.concatenate(embedding_list, axis=0)
         elif model_name == 'all-MiniLM-L6-v2':
             with st.spinner('Generating the embeddings...'):
