@@ -17,7 +17,7 @@ from copy import deepcopy
 
 from tools.data import compute_nn
 from tools.text import TextData
-from tools import oai
+from tools import oai, text
 
 
 def keep(key):
@@ -314,12 +314,19 @@ def generate_report():
     spinner_text = 'Summarizing the clusters with ChatGPT. Please wait...'
     with st.spinner(spinner_text):
         for i, id in enumerate(cluster_ids):
+            doc_samp = doc_samps[id]
+            num_docs = len(doc_samp)
+            max_doc_length = int(8000/num_docs) - 1
+            doc_samp = text.truncate_text(
+                doc_samp,
+                max_length=max_doc_length
+            )
             instructions = "I'm working on a qualitative analysis of a public health \
             dataset. Here's a brief description of the dataset itself: "
             instructions = '\n\n' + st.session_state.summary_description + '\n\n'
             instructions += "And for context, here's a sample of documents from the \
             dataset:\n\n"
-            for doc in doc_samps[id]:
+            for doc in doc_samp:
                 instructions += doc + '\n'
             instructions += "\nBased on these samples, what one word or phrase would \
             you use to describe the information in the documents? Also, could you \
@@ -356,7 +363,7 @@ def generate_report():
 
             # Add the sample docs for reference
             res += '###Samples\n'
-            for doc in doc_samps[id]:
+            for doc in doc_samp:
                 res += str(doc) + '\n'
 
             # Save the completions for writing the full summary
