@@ -13,10 +13,11 @@ import markdown
 import sklearn
 
 from sklearn import metrics
+from copy import deepcopy
 
 from tools.data import compute_nn
 from tools.text import TextData
-from tools import oai
+from tools import oai, text
 
 
 def keep(key):
@@ -172,10 +173,32 @@ def set_text():
 def fetch_embeddings():
     """Generates embeddings for the user's text, along with the associated \
     PCA reduction for initial visualization."""
-    td = fetch_td(st.session_state.embedding_type_select)
+    # Get the current (embedding-less) TD object
+    old_name = st.session_state.embedding_type_select
+    td = deepcopy(fetch_td(old_name))
+
+    # Fetch the embeddings and rename the current object, if it exists
     if td is not None:
-        td.embed(model_name=st.session_state.embedding_model)
+        # Get things ready to rename the TextData object
+        emb_type = st.session_state.embedding_type
+        model_name = st.session_state.embedding_model
+        new_name = emb_type + ' (' + model_name + ')'
+        st.session_state.embedding_type_select = new_name
+
+        # Add TD object to the dict in session state with the new, embedding-
+        # specific name.
+        st.session_state.text_data_dict.update({new_name: td})
+
+        # Get the embeddings and running dimensionality reduction
+        td.embed(model_name=model_name)
         reduce_dimensions()
+
+        # Delete the generic TD object from the session state dict; only
+        # triggered the first time embeddings are run
+        if old_name == 'document':
+            del st.session_state.text_data_dict[old_name]
+
+    # Return an error if it doesn't exist
     else:
         st.error('Please specify a text column to embed.')
     return
@@ -291,12 +314,19 @@ def generate_report():
     spinner_text = 'Summarizing the clusters with ChatGPT. Please wait...'
     with st.spinner(spinner_text):
         for i, id in enumerate(cluster_ids):
+            doc_samp = doc_samps[id]
+            num_docs = len(doc_samp)
+            max_doc_length = int(8000/num_docs) - 1
+            doc_samp = text.truncate_text(
+                doc_samp,
+                max_length=max_doc_length
+            )
             instructions = "I'm working on a qualitative analysis of a public health \
             dataset. Here's a brief description of the dataset itself: "
             instructions = '\n\n' + st.session_state.summary_description + '\n\n'
             instructions += "And for context, here's a sample of documents from the \
             dataset:\n\n"
-            for doc in doc_samps[id]:
+            for doc in doc_samp:
                 instructions += doc + '\n'
             instructions += "\nBased on these samples, what one word or phrase would \
             you use to describe the information in the documents? Also, could you \
@@ -333,7 +363,7 @@ def generate_report():
 
             # Add the sample docs for reference
             res += '###Samples\n'
-            for doc in doc_samps[id]:
+            for doc in doc_samp:
                 res += str(doc) + '\n'
 
             # Save the completions for writing the full summary
@@ -449,10 +479,12 @@ def switch_projection():
     )
     td_name = emb_select
     td = st.session_state.text_data_dict[td_name]
-    reduc_select = st.selectbox('Reduction',
-                                index=None,
-                                options=list(td.reductions.keys()),
-                                placeholder=st.session_state.current_reduction)
+    reduc_select = st.selectbox(
+        label='Reduction',
+        index=0,
+        options=list(td.reductions.keys()),
+        placeholder=st.session_state.current_reduction
+    )
     if st.button('Save and Exit'):
         st.session_state.hover_data = {
             k: st.session_state.hover_data[k]

@@ -6,9 +6,12 @@ import io
 import openai
 import spacy
 import tiktoken
+import threading
+import time
 
 from matplotlib import pyplot as plt
 from multiprocessing import Pool
+from sentence_transformers import SentenceTransformer
 
 from tools import oai, data
 
@@ -35,38 +38,34 @@ class TextData:
         if model_name == 'ada-002':
             oai.load_openai_settings(mode='embeddings')
 
-            # Truncating long documents to match the API limits
-            token_limit = st.session_state.openai_dict['embeddings']['ada-002']['tokens_in']
-            self.docs = truncate_text(self.docs, max_length=token_limit)
-            st.write(len(self.docs))
-
             # Split long sets of documents into medium-sized chunks so the API
             # doesn't explode
-            if len(self.docs) > 2000:
-                doc_list = split_list(self.docs, n=2000)
-            else:
-                doc_list = [self.docs]
+            doc_blocks = chunk_to_tpm(self.docs)
             embedding_list = []
-            with st.spinner('Fetching the embeddings...'):
-                for docs in doc_list:
-                    st.write(len(docs))
-                    st.write(docs[0])
+
+            # Fetch the embeddings for each batch
+            with st.spinner('Generating the embeddings...'):
+                for block_num, doc_block in enumerate(doc_blocks):
                     try:
                         response = openai.Embedding.create(
-                            input=docs,
+                            input=doc_block,
                             engine=engine,
                         )
+                        st.write('received')
                         embedding_list.append(
                             np.array([
                                  response['data'][i]['embedding']
-                                 for i in range(len(docs))
+                                 for i in range(len(doc_block))
                             ])
                         )
-                    except:
-                        st.warning('API error.')
+                    except openai.APIError as e:
+                        st.write(f"OpenAI API returned an API Error: {e}")
                 embeddings = np.concatenate(embedding_list, axis=0)
-        elif model_type == 'huggingface':
-            pass
+        elif model_name == 'all-MiniLM-L6-v2':
+            with st.spinner('Generating the embeddings...'):
+                mod = SentenceTransformer('all-MiniLM-L6-v2')
+                embeddings = mod.encode(self.docs)
+
         self.embeddings = pd.DataFrame(embeddings)
         self.precomputed_knn = data.compute_nn(self.embeddings)
 
@@ -187,6 +186,34 @@ def truncate_text(docs, max_length, scheme='cl100k_base'):
     trimmed_text = tokens_to_docs(trimmed_encodings, scheme)
     return trimmed_text
 
+
+def chunk_to_tpm(
+    docs,
+    max_docs=2000,
+    max_doc_length=8192,
+    tpm=120000,
+    scheme='cl100k_base'
+    ):
+    """Breaks a list of documents into chunks to avoid triggering API TPM
+    limits.
+    """
+    docs = truncate_text(docs, max_length=max_doc_length, scheme=scheme)
+    doc_tokens = docs_to_tokens(docs, scheme=scheme)
+    doc_blocks = []
+    curr_block = []
+    block_length = 0
+    for doc_num, doc in enumerate(docs):
+        block_length += len(doc_tokens[doc_num])
+        if (block_length <= tpm) and (len(curr_block) < max_docs):
+            curr_block.append(doc)
+        else:
+            doc_blocks.append(curr_block)
+            block_length = len(doc_tokens[doc_num])
+            curr_block = [doc]
+    if curr_block:
+        doc_blocks.append(curr_block)
+
+    return doc_blocks
 
 def split_list(lst, n):
     """Splits a list into sublists of size n."""

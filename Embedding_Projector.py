@@ -124,6 +124,10 @@ if 'embedding_model' not in st.session_state:
     st.session_state.embedding_model = openai_defaults['embeddings']['model']
 if 'embedding_type' not in st.session_state:
     st.session_state.embedding_type = 'document'
+if 'embedding_model_choices' not in st.session_state:
+    st.session_state.embedding_model_choices = [
+        'ada-002', 'all-MiniLM-L6-v2'
+    ]
 if 'embeddings' not in st.session_state:
     st.session_state.embeddings = None
 if 'enable_generate_button' not in st.session_state:
@@ -516,7 +520,7 @@ with st.sidebar:
                     key='_embedding_model',
                     on_change=strml.update_settings,
                     kwargs={'keys': ['embedding_model']},
-                    options=['ada-002'],
+                    options=st.session_state.embedding_model_choices,
                     help='The model that will generate the embeddings. For more info \
                     about the different models, see the README.'
                 )
@@ -896,8 +900,23 @@ with st.sidebar:
     st.divider()
     st.subheader('Options')
     if has_reduction:
-        if st.button('Switch projection'):
-            strml.switch_projection()
+        with st.expander('Switch Projection', expanded=False):
+            td_select = st.selectbox(
+                label='Base embeddings',
+                key='_embedding_type_select',
+                on_change=strml.update_settings,
+                kwargs={'keys': ['embedding_type_select']},
+                options=list(st.session_state.text_data_dict.keys()),
+                help='Which embeddings would you like to work with?'
+            )
+            reduc_select = st.selectbox(
+                label='Reduction',
+                key='_current_reduction',
+                options=list(td.reductions.keys()),
+                on_change=strml.update_settings,
+                kwargs={'keys': ['current_reduction']},
+            )
+
 
 # Making the main visualization
 with st.container(border=True):
