@@ -11,5 +11,6 @@ scipy==1.11.4
 sentence-transformers==2.2.2
 spacy==3.7.2
 streamlit==1.42.2
+tiktoken
 umap-learn==0.5.6
 
