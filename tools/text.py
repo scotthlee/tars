@@ -3,7 +3,6 @@ import numpy as np
 import openai
 import streamlit as st
 import io
-import openai
 import spacy
 import tiktoken
 import threading
@@ -13,7 +12,7 @@ from matplotlib import pyplot as plt
 from multiprocessing import Pool
 from sentence_transformers import SentenceTransformer
 
-from tools import oai, data
+from tools import data
 
 
 class TextData:
@@ -31,41 +30,12 @@ class TextData:
 
     def embed(
         self,
-        model_name='ada-002',
-        engine='text-embedding-ada-002'
+        model_name='all-MiniLM-L6-v2'
     ):
         """Embeds the object's text."""
-        if model_name == 'ada-002':
-            oai.load_openai_settings(mode='embeddings')
-
-            # Split long sets of documents into medium-sized chunks so the API
-            # doesn't explode
-            doc_blocks = chunk_to_tpm(self.docs)
-            embedding_list = []
-
-            # Fetch the embeddings for each batch
-            with st.spinner('Generating the embeddings...'):
-                for block_num, doc_block in enumerate(doc_blocks):
-                    try:
-                        response = openai.Embedding.create(
-                            input=doc_block,
-                            engine=engine,
-                        )
-                        st.write('received')
-                        embedding_list.append(
-                            np.array([
-                                 response['data'][i]['embedding']
-                                 for i in range(len(doc_block))
-                            ])
-                        )
-                    except openai.APIError as e:
-                        st.write(f"OpenAI API returned an API Error: {e}")
-                embeddings = np.concatenate(embedding_list, axis=0)
-        elif model_name == 'all-MiniLM-L6-v2':
-            with st.spinner('Generating the embeddings...'):
-                mod = SentenceTransformer('all-MiniLM-L6-v2')
-                embeddings = mod.encode(self.docs)
-
+        with st.spinner('Generating the embeddings...'):
+            mod = SentenceTransformer(model_name)
+            embeddings = mod.encode(self.docs)
         self.embeddings = pd.DataFrame(embeddings)
         self.precomputed_knn = data.compute_nn(self.embeddings)
 

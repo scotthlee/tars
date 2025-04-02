@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import streamlit as st
-import openai
 import os
 import io
 import plotly.express as px
@@ -9,12 +8,11 @@ import zipfile
 
 from dotenv import load_dotenv
 from matplotlib import pyplot as plt
-from azure.identity import ClientSecretCredential
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from umap import UMAP
 
-from tools import oai, data, text, strml
+from tools import data, text, strml
 
 
 # Setting the "about" section text
@@ -45,112 +43,20 @@ st.set_page_config(
 if 'about_text' not in st.session_state:
     st.session_state.about_text = about_text
 
-# Fetch an API key
-def load_api_key():
-    """Get API Key using Azure Service Principal."""
-    load_dotenv()
-
-    # Set up credentials based on Azure Service Principal
-    credential = ClientSecretCredential(
-        tenant_id=os.environ["SP_TENANT_ID"],
-        client_id=os.environ["SP_CLIENT_ID"],
-        client_secret=os.environ["SP_CLIENT_SECRET"]
-    )
-
-    # Set the API_KEY to the token from the Azure credentials
-    os.environ['OPENAI_API_KEY'] = credential.get_token(
-        "https://cognitiveservices.azure.com/.default").token
-
-load_api_key()
-
-# Set up the OpenAI API settings
-st.session_state.gpt_keys = [
-    'engine', 'max_tokens', 'top_p', 'temperature',
-    'frequency_penalty', 'presence_penalty'
-]
-openai_dict = {
-    'chat':{
-        'gpt-4': {
-            'engine': 'edav-api-share-gpt4-api-nofilter',
-            'url': os.environ['OPENAI_BASE_URL'],
-            'key': os.environ["OPENAI_API_KEY"],
-            'tokens_in': 128000,
-            'tokens_out': 4096
-        }
-    },
-    'embeddings': {
-        'ada-002': {
-            'engine': 'text-embedding-ada-002',
-            'url': os.environ['OPENAI_BASE_URL'],
-            'key': os.environ['OPENAI_API_KEY'],
-            'type': 'openai',
-            'tokens_in': 8192,
-            'tpm_limit': 120000,
-            'document_limit': None
-        }
-    }
-}
-openai_defaults = {
-    'chat': {
-        'model': 'gpt-4',
-        'engine': os.environ['OPENAI_GPT_DEPLOYMENT'],
-        'max_tokens': None,
-        'top_p': 0.95,
-        'temperature': 0.20,
-        'presence_penalty': 0.0,
-        'frequency_penalty': 0.0
-    },
-    'embeddings': {
-        'model': 'ada-002',
-        'engine': 'text-embedding-ada-002'
-    }
-}
-
-if 'openai_dict' not in st.session_state:
-    st.session_state.openai_dict = openai_dict
-if 'chat_model' not in st.session_state:
-    st.session_state.chat_model = openai_defaults['chat']['model']
-if 'chat_engine' not in st.session_state:
-    st.session_state.engine = openai_defaults['chat']['engine']
-if 'chat_engine_choices' not in st.session_state:
-    st.session_state.engine_choices = list(openai_dict['chat'].keys())
-if 'gpt_persona' not in st.session_state:
-    st.session_state.gpt_persona = "You are a health communications specialist \
-    with expertise in qualitative analysis."
-
-if 'embedding_engine' not in st.session_state:
-    st.session_state.embedding_engine = openai_defaults['embeddings']['engine']
+# Setting up the embedding session state variables
 if 'embedding_model' not in st.session_state:
-    st.session_state.embedding_model = openai_defaults['embeddings']['model']
+    st.session_state.embedding_model = 'all-MiniLM-L6-v2'
 if 'embedding_type' not in st.session_state:
     st.session_state.embedding_type = 'document'
 if 'embedding_model_choices' not in st.session_state:
     st.session_state.embedding_model_choices = [
-        'ada-002', 'all-MiniLM-L6-v2'
+        'all-MiniLM-L6-v2', 'all-MiniLM-L12-v2', 'all-mpnet-base-v2',
+        'paraphrase-MiniLM-L3-v2', 'paraphrase-albert-small-v2'
     ]
 if 'embeddings' not in st.session_state:
     st.session_state.embeddings = None
 if 'enable_generate_button' not in st.session_state:
     st.session_state.enable_generate_button = False
-
-if 'api_type' not in st.session_state:
-    st.session_state.api_type = os.environ['OPENAI_API_TYPE']
-if 'api_version' not in st.session_state:
-    st.session_state.api_version = os.environ['OPENAI_API_VERSION']
-if 'base_url' not in st.session_state:
-    st.session_state.base_url = openai_dict['chat'][st.session_state.chat_model]['url']
-if 'temperature' not in st.session_state:
-    st.session_state.temperature = openai_defaults['chat']['temperature']
-if 'max_tokens' not in st.session_state:
-    st.session_state.max_tokens = openai_defaults['chat']['max_tokens']
-if 'top_p' not in st.session_state:
-    st.session_state.top_p = openai_defaults['chat']['top_p']
-if 'presence_penalty' not in st.session_state:
-    st.session_state.presence_penalty = openai_defaults['chat']['presence_penalty']
-if 'frequency_penalty' not in st.session_state:
-    st.session_state.frequency_penalty = openai_defaults['chat']['frequency_penalty']
-
-# Setting up the I?O objects
 if 'embedding_type_select' not in st.session_state:
     st.session_state.embedding_type_select = None
 if 'reduction_select' not in st.session_state:
@@ -350,22 +256,6 @@ if 'show_legend' not in st.session_state:
 if st.session_state.map_in_3d:
     st.session_state.hover_data.update({'d3': False})
 
-# Setting up the summary report options
-if 'summary_description' not in st.session_state:
-    st.session_state.summary_description = ''
-if 'summary_top_questions' not in st.session_state:
-    st.session_state.summary_top_questions = 'Question 1\nQuestion 2\n...'
-if 'summary_cluster_choice' not in st.session_state:
-    st.session_state.cluster_choice = None
-if 'summary_n_samles' not in st.session_state:
-    st.session_state.summary_n_samples = 10
-if 'summary_methods_section' not in st.session_state:
-    st.session_state.summary_methods_section = False
-if 'summary_report' not in st.session_state:
-    st.session_state.summary_report = None
-if 'summary_file_type' not in st.session_state:
-    st.session_state.summary_file_type = 'html'
-
 # Loading the handful of variables that don't persist across pages
 to_load = ['text_column', 'data_type']
 for key in to_load:
@@ -376,7 +266,6 @@ for key in to_load:
 td_name = st.session_state.embedding_type_select
 has_data = td_name is not None
 has_source = st.session_state.source_file is not None
-has_report = st.session_state.summary_report is not None
 tabular_source = st.session_state.data_type == 'Tabular data with text column'
 
 # Some bools for controlling menu expansion and container rendering
@@ -482,13 +371,6 @@ with st.sidebar:
                     mime='image/svg',
                     file_name='dendrogram.svg',
                     help='Downloads the clustering dendrogram.'
-                )
-            if has_report:
-                st.download_button(
-                    label='Summary Report',
-                    file_name='summary_report.html',
-                    data=st.session_state.summary_report,
-                    mime='text/html'
                 )
     st.divider()
     st.subheader('Analysis')
@@ -825,78 +707,6 @@ with st.sidebar:
                   help='How tall you want the scatterplot to be. It will fill \
                   the width of the screen by default, but the height is \
                   adjustable.')
-    if has_clusters:
-        with st.expander('Summarize', expanded=False):
-            with st.form(key='summary_form', border=False):
-                dataset_description = st.text_area(
-                    label='Dataset description',
-                    key='_summary_description',
-                    value=st.session_state.summary_description,
-                    help="Generally, what is the text in your dataset about? For \
-                    example, if they come from a scientific study, you might \
-                    describe the setting and goals of the study. This will \
-                    serve as context for ChatGPT as it summarizes the \
-                    information in the dataset."
-                )
-                top_questions = st.text_area(
-                    label='Top questions',
-                    key='_summary_top_questions',
-                    value=st.session_state.summary_top_questions,
-                    help="What are the most important questions you'd like \
-                    answered about the text in your dataset? Please write each \
-                    question on its own line."
-                )
-                cluster_choice = st.selectbox(
-                    label='Clustering choice',
-                    key='_summary_cluster_choice',
-                    options=td.reductions[cr].label_df.columns.values,
-                    help="Which clustering result would you like to use to \
-                    group the embeddings? Each cluster will be summarized on \
-                    its own, and the then those summaries will be used to \
-                    produce a top-level summary for the whole datset."
-                )
-                n_samples = st.number_input(
-                    label='Number of samples',
-                    min_value=1,
-                    max_value=50,
-                    value=st.session_state.summary_n_samples,
-                    key='_summary_n_samples',
-                    help="How many samples from each cluster you'd like to send \
-                    to ChatGPT for it to use as a reference when summarizing \
-                    the information is in the cluster."
-                )
-                file_type = st.radio(
-                    label='File format',
-                    options=['html', 'text'],
-                    horizontal=True,
-                    key='_summary_file_type',
-                    help="The file format for the summary report. 'text' will \
-                    render the report plain text (.txt), and 'html' will \
-                    render it in Markdown (.html)."
-                )
-                methods_toggle = st.toggle(
-                    label='Include methods section',
-                    key='_summary_methods_section',
-                    value=st.session_state.summary_methods_section,
-                    disabled=True,
-                    help="Whether to include a methods section in the summary \
-                    report with information about your chosen embedding model, \
-                    dimensionality-reduction algorithm, and clustering \
-                    algorithm."
-                )
-                if st.form_submit_button('Generate report'):
-                    strml.update_settings(
-                        keys=[
-                            'summary_description',
-                            'summary_top_questions',
-                            'summary_n_samples',
-                            'summary_cluster_choice',
-                            'summary_file_type',
-                            'summary_methods_section'
-                        ],
-                        toast=False
-                    )
-                    strml.generate_report()
     st.divider()
     st.subheader('Options')
     if has_reduction:

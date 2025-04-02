@@ -8,7 +8,6 @@ import pandas as pd
 import streamlit as st
 import ast
 import pymupdf
-import openai
 import markdown
 import sklearn
 
@@ -17,7 +16,7 @@ from copy import deepcopy
 
 from tools.data import compute_nn
 from tools.text import TextData
-from tools import oai, text
+from tools import text
 
 
 def keep(key):
@@ -45,21 +44,6 @@ def update_settings(keys, toast=True, toast_icon='👍'):
             return
     if toast:
         st.toast('Settings updated!', icon=toast_icon)
-    return
-
-
-def generate_disclaimer():
-    """Generates a basic disclaimer that content was generated with ChatGPT."""
-    disclaimer = '\n\n ### Generative AI Disclosure'
-    disclaimer += '\nContent created with the help of '
-    disclaimer += str(st.session_state.engine) + '. '
-    return disclaimer
-
-
-def reset_gpt():
-    """Restores the default ChatGPT settings."""
-    for key in st.session_state.gpt_keys:
-        st.session_state[key] = st.session_state.gpt_defaults[key]
     return
 
 
@@ -285,157 +269,6 @@ def generate_cluster_keywords():
     return
 
 
-def generate_report():
-    """Generates a summary report of the information in the user's documents,
-    organized by cluster.
-    """
-    # Load API settings
-    oai.load_openai_settings(mode='chat')
-
-    # Fetch the correct cluster model
-    td = fetch_td(st.session_state.embedding_type_select)
-    reduction = st.session_state.current_reduction
-    id_col = st.session_state.summary_cluster_choice
-    cm = td.reductions[reduction].cluster_models[id_col]
-    alg = cm.model_name
-
-    # Prep the individual cluster samples
-    samp_size = int(st.session_state.summary_n_samples)
-    docs = td.docs
-    doc_samps = cm.sample_docs(docs=docs, max_count=samp_size)
-    cluster_ids = list(doc_samps.keys())
-
-    # Pull the quantitative measures for use later
-    quant_reports = cluster_stats_to_text(cm)
-
-    # Prep the LLM prompt
-    report = ''
-    completions = ''
-    spinner_text = 'Summarizing the clusters with ChatGPT. Please wait...'
-    with st.spinner(spinner_text):
-        for i, id in enumerate(cluster_ids):
-            doc_samp = doc_samps[id]
-            num_docs = len(doc_samp)
-            max_doc_length = int(8000/num_docs) - 1
-            doc_samp = text.truncate_text(
-                doc_samp,
-                max_length=max_doc_length
-            )
-            instructions = "I'm working on a qualitative analysis of a public health \
-            dataset. Here's a brief description of the dataset itself: "
-            instructions = '\n\n' + st.session_state.summary_description + '\n\n'
-            instructions += "And for context, here's a sample of documents from the \
-            dataset:\n\n"
-            for doc in doc_samp:
-                instructions += doc + '\n'
-            instructions += "\nBased on these samples, what one word or phrase would \
-            you use to describe the information in the documents? Also, could you \
-            a brief summary of the samples that would help someone answer the \
-            following questions:\n\n"
-            instructions += st.session_state.summary_top_questions
-            instructions += "\n\nPlease format your answers using the following \
-            template: \n\n###Keywords\n[KEYWORDS/PHRASES GO HERE]\n\n \
-            ###Summary\n[BRIEF SUMMARY GOES HERE]."
-
-            # Generate the report
-            message = [
-                {
-                    "role": "system",
-                    "content": st.session_state.gpt_persona
-                },
-                {
-                    "role": "user",
-                    "content": instructions
-                },
-            ]
-            completion = openai.ChatCompletion.create(
-                engine=st.session_state.engine,
-                messages=message,
-                temperature=st.session_state.temperature,
-                max_tokens=st.session_state.max_tokens,
-                top_p=st.session_state.top_p,
-                frequency_penalty=st.session_state.frequency_penalty,
-                presence_penalty=st.session_state.presence_penalty,
-                stop=None
-            )
-            res = completion['choices'][0]['message']['content']
-            res += '\n\n'
-
-            # Add the sample docs for reference
-            res += '###Samples\n'
-            for doc in doc_samp:
-                res += str(doc) + '\n'
-
-            # Save the completions for writing the full summary
-            completions += res
-
-            # Add the cluster-specific metrics to the top
-            cl_report = quant_reports[id] + '\n\n' + res
-            cl_report = '##Cluster ID: ' + str(id) + '\n' + cl_report + '\n\n'
-            report += cl_report
-
-        # Write the summary report based on the cluster results
-        # Generate the report
-        instructions = "I'm working on a qualitative analysis for a public \
-        health dataset. I've grouped the documents by keyword and theme and \
-        included samples from each group for you to review below:"
-        instructions += '\n\n' + completions + '\n\n'
-        instructions += "Based on these samples, please write a medium-length \
-        summary (300 to 500 words) of the whole dataset that addresses the \
-        following questions for me:\n\n"
-        instructions += st.session_state.summary_top_questions + '\n\n'
-        instructions += "Please only provide your summary--do not provide any \
-        of the information in the samples I have provided."
-        message = [
-            {
-                "role": "system",
-                "content": st.session_state.gpt_persona
-            },
-            {
-                "role": "user",
-                "content": instructions
-            },
-        ]
-        completion = openai.ChatCompletion.create(
-            engine=st.session_state.engine,
-            messages=message,
-            temperature=st.session_state.temperature,
-            max_tokens=st.session_state.max_tokens,
-            top_p=st.session_state.top_p,
-            frequency_penalty=st.session_state.frequency_penalty,
-            presence_penalty=st.session_state.presence_penalty,
-            stop=None
-        )
-        res = completion['choices'][0]['message']['content']
-        res = "#Overall Summary\n\n" + res + "\n\n\n"
-        res += "#Cluster-Specific Summaries\n\n"
-
-        # Adding the LLM disclaimer
-        disclaimer = "\n\n#Generative AI Disclaimer\n"
-        disclaimer += "This report generated by " + st.session_state.chat_model + "."
-
-        # Save the report to the session state
-        full_report = res + report + disclaimer
-        report_text = full_report.replace('#', '')
-        report_html = markdown.markdown(
-            text=full_report,
-            output_format='html',
-            extensions=['nl2br']
-        )
-        report_dict = {
-            'text': report_text,
-            'html': report_html
-        }
-        file_type = st.session_state.summary_file_type
-        st.session_state.summary_report = report_dict[file_type]
-    st.toast(
-        body='Report generation finished! Head to "Download" in the I/O \
-        section to download a copy.'
-    )
-    st.rerun()
-    return
-
-
 def cluster_stats_to_text(cm):
     """Writes a short text report with quantitative clustering metrics."""
     counts = cm.counts
@@ -468,31 +301,3 @@ def run_auto_clustering(
     metric='silhouette_score'
     ):
     pass
-
-
-@st.dialog('Switch Projection')
-def switch_projection():
-    emb_select = st.selectbox(
-        label='Base embeddings',
-        options=list(st.session_state.text_data_dict.keys()),
-        help='Which embeddings would you like to work with?'
-    )
-    td_name = emb_select
-    td = st.session_state.text_data_dict[td_name]
-    reduc_select = st.selectbox(
-        label='Reduction',
-        index=0,
-        options=list(td.reductions.keys()),
-        placeholder=st.session_state.current_reduction
-    )
-    if st.button('Save and Exit'):
-        st.session_state.hover_data = {
-            k: st.session_state.hover_data[k]
-            for k in list(st.session_state.hover_data.keys())
-            if '_id' not in k
-        }
-        st.session_state.color_column = None
-        st.session_state.hover_columns = None
-        st.session_state.embedding_type_select = emb_select
-        st.session_state.current_reduction = reduc_select
-        st.rerun()

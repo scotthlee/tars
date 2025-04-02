@@ -72,7 +72,6 @@ if 'display_column_hide' not in st.session_state:
 td_name = st.session_state.embedding_type_select
 has_data = td_name is not None
 has_source = st.session_state.source_file is not None
-has_report = st.session_state.summary_report is not None
 tabular_source = st.session_state.data_type == 'Tabular data with text column'
 
 # Some bools for controlling menu expansion and container rendering
