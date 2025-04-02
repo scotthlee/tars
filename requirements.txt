@@ -27,6 +27,5 @@ tk==0.1.0
 tokenizers==0.20.0
 torch==2.1.1
 torchvision==0.16.1
-transformers==4.45.1
 umap-learn==0.5.6
 
