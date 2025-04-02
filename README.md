@@ -1,6 +1,8 @@
 # Text Analysis and Representation System (TARS)
 TARS is a web app, written in [Streamlit](https://streamlit.io/), for generating and analyzing text embeddings. Broadly, the app recreates the analytic flow of embeddings-based topic-modeling algorithms like [BERTopic](https://maartengr.github.io/BERTopic/index.html), allowing users to generate embeddings, reduce their dimensionality, and cluster them in the dimensionally-reduced space. Like BERTopic, the app can generate lists of potential topics using a cluster-based variant of [TF-IDF](https://en.wikipedia.org/wiki/Tf–idf), but, by way of LLM-based iterative summarization, it can also generate free-text summaries of the information in the clusters. The app makes these summaries, as well as any data artifacts generated during a session, available for download and further analysis offline.
 
+**Note**: This version of the app uses the Azure OpenAI API to generate embeddings and summarize text. For a non-API version, check out the [hf-local](https://github.com/scotthlee/tars/tree/hf-local) branch, which drops the summarization feature and generates embeddings on-machine with smaller embedding models from the `sentence-transformers` library.
+
 ## User Interface
 The app has two pages: an embedding projector for working with the embeddings, and a data editor for editing the underlying session metadata and clustering results. Both pages point to the same set of underlying data objects, so changes to the data in one should propagate to the other, and vice-versa.
 
