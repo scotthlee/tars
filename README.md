@@ -59,7 +59,7 @@ There are a number of ways to [deploy Streamlit apps](https://docs.posit.co/conn
 tars/</pre>
 
 ### Notes
-This version of the app runs all embedding models locally. We added a few smaller models to the default list to support usage on machines with GPUs, but if you'd like to run the bigger models available through the `sentence-transformers` package from `huggingface`, feel free to add them to the `embedding_model_choices` session state variable list [here](). Once you've done that, they'll show up in the drop-down menu for selection, and off you go!
+This version of the app runs all embedding models locally. We added a few smaller models to the default list to support usage on machines with GPUs, but if you'd like to run the bigger models available through the `sentence-transformers` package from `huggingface`, feel free to add them to the `embedding_model_choices` session state variable list [here](https://github.com/scotthlee/tars/blob/736919ab6d84b381c5e6bdfb79dd782b549bb4d4/Embedding_Projector.py#L52). Once you've done that, they'll show up in the drop-down menu for selection, and off you go!
 
 ## License Standard Notice
 The repository utilizes code licensed under the terms of the Apache Software
