@@ -1,5 +1,5 @@
 # Text Analysis and Representation System (TARS)
-TARS is a web app, written in [Streamlit](https://streamlit.io/), for generating and analyzing text embeddings. Broadly, the app recreates the analytic flow of embeddings-based topic-modeling algorithms like [BERTopic](https://maartengr.github.io/BERTopic/index.html), allowing users to generate embeddings, reduce their dimensionality, and cluster them in the dimensionally-reduced space. Like BERTopic, the app can generate lists of potential topics using a cluster-based variant of [TF-IDF](https://en.wikipedia.org/wiki/Tf–idf), but, by way of LLM-based iterative summarization, it can also generate free-text summaries of the information in the clusters. The app makes these summaries, as well as any data artifacts generated during a session, available for download and further analysis offline.
+TARS is a web app, written in [Streamlit](https://streamlit.io/), for generating and analyzing text embeddings. Broadly, the app recreates the analytic flow of embeddings-based topic-modeling algorithms like [BERTopic](https://maartengr.github.io/BERTopic/index.html), allowing users to generate embeddings, reduce their dimensionality, and cluster them in the dimensionally-reduced space. Like BERTopic, the app also generates lists of potential topics using a cluster-based variant of [TF-IDF](https://en.wikipedia.org/wiki/Tf–idf).
 
 ## User Interface
 The app has two pages: an embedding projector for working with the embeddings, and a data editor for editing the underlying session metadata and clustering results. Both pages point to the same set of underlying data objects, so changes to the data in one should propagate to the other, and vice-versa.
@@ -31,11 +31,8 @@ The app implements three algorithms for reducing the size of the raw text embedd
 ### Cluster Analysis
 The app supports four clustering algorithms: [k-means](https://en.wikipedia.org/wiki/K-means_clustering), [DBSCAN](https://en.wikipedia.org/wiki/DBSCAN), [HDBSCAN](https://hdbscan.readthedocs.io/en/latest/how_hdbscan_works.html), and [agglomerative clustering](https://en.wikipedia.org/wiki/Hierarchical_clustering), all implemented with `scikit-learn`. After selecting an algorithm from the dropdown menu, users can modify the values for the algorithm's main hyperparameters (e.g., the number of cluster for k-means, or epsilon for DBSCAN), and they can supply arguments for modifying other hyperparameters as a dict of keyword arg to be unpacked at runtime.
 
-### Summarization and Interpretation
-Users can get summaries of the information in each of the embedding clusters in two ways: by checking the list of cluster-based keywords, generated automatically when a clustering algorithm is run, and available immediately for download thereafter; and by generating a free-text summary report using the features in the `Summarize` expander menu. For the latter, users can tailor the summary report to their particular needs by providing a high-level description of the data they uploaded to embed, and by providing a list of questions they would like answered about the text in each cluster. With those in place, the final steps are to choose a fitted cluster model to use for groupng the embeddings and to specify how many documents should be randommly sampled from each cluster for ChatGPT to use as the basis for writing its summary. The final summary report is generated iteratively, with the cluster-specific summaries being run first, and the top-level report being generated at the end.
-
 ### Downloading Artifacts
-At any point during a work session, users can download whatever data artifacts have been generated. Download buttons will appear in the `I/O` expander menu for the raw embeddings, reduced-dimensionality embeddings, cluster keywords, and LLM-generated cluster summary report as they are created by the app. Cluster IDs are attached to rows in the files holding the reduced embeddings and cluster keywords, and cluster sizes and variances are provided in the summary report, along with the corresponding cluster IDs. 
+At any point during a work session, users can download whatever data artifacts have been generated. Download buttons will appear in the `I/O` expander menu for the raw embeddings, reduced-dimensionality embeddings, and cluster keywords. 
 
 ## Deployment Options
 ### Local Machine
@@ -59,19 +56,10 @@ There are a number of ways to [deploy Streamlit apps](https://docs.posit.co/conn
 --server POSIT_CONNECT_SERVER_ADDRESS \
 --api-key YOUR_API_KEY \
 --entrypoint Embedding_Projector.py \
---environment OPENAI_BASE_URL \
---environment OPENAI_API_TYPE \
---environment OPENAI_API_VERSION \
---environment OPENAI_GPT_DEPLOYMENT \
---environment SP_TENANT_ID \
---environment SP_CLIENT_ID \
---environment SP_CLIENT_SECRET \
 tars/</pre>
 
-If you'd rather add your environment variables to the app after deployment, you can delete those lines, and if you run into errors with authentication during deployment, you can try adding the `--insecure` flag to the command, although that may not adhere to security best practices. In all cases, you will need an API key for your Posit Connect account (`YOUR_API_KEY` in the example above), and your account will probably need Publisher access to the platform.
-
 ### Notes
-This version of the app requires an Azure Service Principal with access to the Azure OpenAI API. Environment variables should match how they are used in the code, for example, so that `OPENAI_BASE_URL` is the base URL for the relevant Azure OpenAI model deployments (the app uses `gpt-4-turbo` and `text-embedding-ada-002`), `OPENAI_GPT_DEPLOYMENT` is the name of the chat deployment you'd like to use, `OPENAI_API_TYPE` is 'azure_ad', `SP_TENANT_ID` is your Service Principal tenant ID, and so on.
+This version of the app runs all embedding models locally. We added a few smaller models to the default list to support usage on machines with GPUs, but if you'd like to run the bigger models available through the `sentence-transformers` package from `huggingface`, feel free to add them to the `embedding_model_choices` session state variable list [here](). Once you've done that, they'll show up in the drop-down menu for selection, and off you go!
 
 ## License Standard Notice
 The repository utilizes code licensed under the terms of the Apache Software
