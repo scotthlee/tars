@@ -27,6 +27,6 @@ streamlit==1.42.2
 tiktoken==0.5.2
 tk==0.1.0
 tokenizers==0.20.0
-torch==2.1.1
+torch==2.4.0
 torchvision==0.16.1
 umap-learn==0.5.6
