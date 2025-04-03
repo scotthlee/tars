@@ -43,6 +43,9 @@ def update_settings(keys, toast=True, toast_icon='👍'):
             keep(key)
         else:
             return
+    if key in ['current_reduction', 'embedding_type_select']:
+        st.session_state['color_column'] = None
+        st.session_state['hover_columns'] = None
     if toast:
         st.toast('Settings updated!', icon=toast_icon)
     return
