@@ -136,20 +136,6 @@ class TextData:
         return
 
 
-def docs_to_sents():
-    """Converts a set of documents to a set of sentences."""
-    sf = st.session_state.source_file
-    docs = st.session_state.text['documents']
-    nlp = spacy.load(name='en_core_web_sm',
-                     enable='senter',
-                     config={'nlp': {'disabled': []}})
-    sents = [[s for s in nlp(d).sents] for d in docs]
-    sents_flat = [s for l in sents for s in l]
-    rows = [[i] * len(l) for i, l in enumerate(sents)]
-    rows_flat = [r for l in rows for r in l]
-    return sents_flat, rows_flat
-
-
 def average_embeddings(embeddings, weights=None, axis=0):
     """Calculates a (potentially weighted) average of an array of embeddings."""
     if weights is not None:
@@ -214,6 +200,7 @@ def chunk_to_tpm(
         doc_blocks.append(curr_block)
 
     return doc_blocks
+
 
 def split_list(lst, n):
     """Splits a list into sublists of size n."""

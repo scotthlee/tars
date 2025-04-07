@@ -11,6 +11,7 @@ import pymupdf
 import openai
 import markdown
 import sklearn
+import time
 
 from sklearn import metrics
 from copy import deepcopy
@@ -473,29 +474,58 @@ def run_auto_clustering(
     pass
 
 
-@st.dialog('Switch Projection')
-def switch_projection():
-    emb_select = st.selectbox(
-        label='Base embeddings',
-        options=list(st.session_state.text_data_dict.keys()),
-        help='Which embeddings would you like to work with?'
-    )
-    td_name = emb_select
-    td = st.session_state.text_data_dict[td_name]
-    reduc_select = st.selectbox(
-        label='Reduction',
-        index=0,
-        options=list(td.reductions.keys()),
-        placeholder=st.session_state.current_reduction
-    )
-    if st.button('Save and Exit'):
-        st.session_state.hover_data = {
-            k: st.session_state.hover_data[k]
-            for k in list(st.session_state.hover_data.keys())
-            if '_id' not in k
-        }
-        st.session_state.color_column = None
-        st.session_state.hover_columns = None
-        st.session_state.embedding_type_select = emb_select
-        st.session_state.current_reduction = reduc_select
-        st.rerun()
+def split_docs(docs, doc_ids, split_by='idea'):
+    """Converts a set of documents to a set of sentences."""
+    new_docs = []
+    new_doc_ids = []
+    if split_by == 'sentence':
+        nlp = spacy.load(
+            name='en_core_web_sm',
+            enable='senter',
+            config={'nlp': {'disabled': []}}
+        )
+        new_docs = [[s for s in nlp(d).sents] for d in docs]
+        new_doc_ids = [[doc_ids[i]] * len(l) for i, l in enumerate(new_docs)]
+    elif split_by == 'idea':
+        #oai.load_openai_settings()
+        for i, doc in enumerate(docs):
+            print(i)
+            wait = 2
+            success = False
+            while not success:
+                try:
+                    message = [
+                        {
+                            "role": "system",
+                            "content": "The following text may reflect more than one \
+                            coherent idea. If that's the case (there's more than one \
+                            idea), please break it up into smaller pieces, where each \
+                            piece reflects a single idea, and return the pieces as a \
+                            Python list (e.g. ['idea one text', 'idea two text'], \
+                            etc.). Leave no text behind--each part of the original \
+                            must be in the returned list--and do not split text if \
+                            it's only a sentence long or shorter."
+                        },
+                        {
+                            "role": "user",
+                            "content": doc
+                        },
+                    ]
+                    completion = openai.ChatCompletion.create(
+                        engine='edav-api-share-gpt4-api-nofilter',
+                        messages=message,
+                        temperature=0,
+                        max_tokens=4096,
+                        stop=None
+                    )
+                    res = eval(completion['choices'][0]['message']['content'])
+                    new_docs.append(res)
+                    new_doc_ids.append([doc_ids[i]] * len(res))
+                    success = True
+                except:
+                    time.sleep(wait)
+                    wait *= 2
+    # Flattening the lists
+    new_docs = [str(s) for l in new_docs for s in l]
+    new_doc_ids = [str(r) for l in new_doc_ids for r in l]
+    return new_docs, new_doc_ids
