@@ -145,9 +145,11 @@ def set_text():
         data_type = st.session_state.data_type
         if data_type == 'Tabular data with text column':
             td = TextData(docs=docs, metadata=sf)
+            td_name = 'Base'
         elif data_type == 'Metadata':
             # Setting the docs for the current TextData object
-            td = fetch_td('Document')
+            td_name = 'Document'
+            td = fetch_td(td_name)
             td.docs = docs
 
             # Running cluster keywords, if any cluster models have been run; this
@@ -165,9 +167,7 @@ def set_text():
                             )
 
         # Set some other session state variables
-        st.session_state.embedding_type = 'Document'
-        st.session_state.text_data_dict.update({'Document': td})
-        st.session_state.embedding_type_select = 'Document'
+        st.session_state.text_data_dict.update({td_name: td})
         st.session_state.hover_columns = [text_col]
         st.session_state.source_file = sf
         st.session_state.enable_generate_button = True
@@ -178,9 +178,8 @@ def fetch_embeddings():
     """Generates embeddings for the user's text, along with the associated \
     PCA reduction for initial visualization."""
     # Get the current (embedding-less) TD object
-    old_name = st.session_state.embedding_type_select
     emb_type = st.session_state.embedding_type
-    td = deepcopy(fetch_td(old_name))
+    td = deepcopy(fetch_td('Base'))
 
     # Fetch the embeddings and rename the current object, if it exists
     if td is not None:
@@ -198,7 +197,7 @@ def fetch_embeddings():
                     doc_ids=doc_ids,
                     split_by='sentence'
                 )
-            elif emb_type == 'idear':
+            elif emb_type == 'Idea':
                 pass
             td.docs = docs
             doc_ids = [int(id) for id in doc_ids]
@@ -213,12 +212,7 @@ def fetch_embeddings():
         # Get the embeddings and running dimensionality reduction
         td.embed(model_name=model_name)
         reduce_dimensions()
-
-        # Delete the generic TD object from the session state dict; only
-        # triggered the first time embeddings are run
-        if emb_type == 'Document':
-            del st.session_state.text_data_dict[emb_type]
-
+    
     # Return an error if it doesn't exist
     else:
         st.error('Please specify a text column to embed.')

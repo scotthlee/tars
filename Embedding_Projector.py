@@ -902,13 +902,14 @@ with st.sidebar:
     if has_reduction:
         with st.expander('Switch Projection', expanded=False):
             td_keys = list(st.session_state.text_data_dict.keys())
+            td_keys.remove('Base')
             td_select = st.selectbox(
                 label='Base embeddings',
                 key='_embedding_type_select',
                 index=td_keys.index(td_name),
                 on_change=strml.update_settings,
                 kwargs={'keys': ['embedding_type_select']},
-                options=list(st.session_state.text_data_dict.keys()),
+                options=td_keys,
                 help='Which embeddings would you like to work with?'
             )
             reduc_select = st.selectbox(
