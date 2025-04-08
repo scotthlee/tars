@@ -508,6 +508,7 @@ with st.sidebar:
                 st.selectbox(
                     label='Type',
                     key='_embedding_type',
+                    index=None,
                     on_change=strml.update_settings,
                     kwargs={'keys': ['embedding_type']},
                     options=['Document', 'Sentence'],
