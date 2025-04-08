@@ -144,11 +144,9 @@ def set_text():
         # Create a new TextData object with the text as its docs
         data_type = st.session_state.data_type
         if data_type == 'Tabular data with text column':
-            text_type = 'Document'
             td = TextData(docs=docs, metadata=sf)
         elif data_type == 'Metadata':
             # Setting the docs for the current TextData object
-            text_type = 'Document'
             td = fetch_td('Document')
             td.docs = docs
 
@@ -167,8 +165,9 @@ def set_text():
                             )
 
         # Set some other session state variables
-        st.session_state.embedding_type = text_type
-        st.session_state.text_data_dict.update({text_type: td})
+        st.session_state.embedding_type = 'Document'
+        st.session_state.text_data_dict.update({'Document': td})
+        st.session_state.embedding_type_select = 'Document'
         st.session_state.hover_columns = [text_col]
         st.session_state.source_file = sf
         st.session_state.enable_generate_button = True
