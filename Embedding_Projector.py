@@ -122,8 +122,6 @@ if 'embedding_engine' not in st.session_state:
     st.session_state.embedding_engine = openai_defaults['embeddings']['engine']
 if 'embedding_model' not in st.session_state:
     st.session_state.embedding_model = openai_defaults['embeddings']['model']
-if 'embedding_type' not in st.session_state:
-    st.session_state.embedding_type = 'document'
 if 'embedding_model_choices' not in st.session_state:
     st.session_state.embedding_model_choices = [
         'ada-002', 'all-MiniLM-L6-v2'
@@ -132,6 +130,8 @@ if 'embeddings' not in st.session_state:
     st.session_state.embeddings = None
 if 'enable_generate_button' not in st.session_state:
     st.session_state.enable_generate_button = False
+if 'embedding_type' not in st.session_state:
+    st.session_state.embedding_type = None
 
 if 'api_type' not in st.session_state:
     st.session_state.api_type = os.environ['OPENAI_API_TYPE']
@@ -510,7 +510,7 @@ with st.sidebar:
                     key='_embedding_type',
                     on_change=strml.update_settings,
                     kwargs={'keys': ['embedding_type']},
-                    options=['document'],
+                    options=['Document', 'Sentence'],
                     help="Whether you'd like to make embeddings for each 'document' \
                     in your dataset (documents being text contained by a single \
                     spreadhseet cell) or for the sentences in all the documents."
@@ -901,9 +901,11 @@ with st.sidebar:
     st.subheader('Options')
     if has_reduction:
         with st.expander('Switch Projection', expanded=False):
+            td_keys = list(st.session_state.text_data_dict.keys())
             td_select = st.selectbox(
                 label='Base embeddings',
                 key='_embedding_type_select',
+                index=td_keys.index(td_name),
                 on_change=strml.update_settings,
                 kwargs={'keys': ['embedding_type_select']},
                 options=list(st.session_state.text_data_dict.keys()),

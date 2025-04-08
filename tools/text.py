@@ -51,7 +51,6 @@ class TextData:
                             input=doc_block,
                             engine=engine,
                         )
-                        st.write('received')
                         embedding_list.append(
                             np.array([
                                  response['data'][i]['embedding']

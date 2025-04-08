@@ -12,6 +12,7 @@ import openai
 import markdown
 import sklearn
 import time
+import spacy
 
 from sklearn import metrics
 from copy import deepcopy
@@ -94,8 +95,8 @@ def load_file():
                 docs.append(doc)
             td = TextData(docs=docs)
             st.session_state.source_file = docs[0]
-            st.session_state.embedding_type_select = 'documents'
-            st.session_state.text_data_dict.update({'documents': td})
+            st.session_state.embedding_type_select = 'Document'
+            st.session_state.text_data_dict.update({'Document': td})
         elif data_type == 'Premade embeddings':
             try:
                 embeddings = pd.read_csv(sf)
@@ -105,8 +106,8 @@ def load_file():
             td = TextData(embeddings=embeddings)
             td.precomputed_knn = compute_nn(embeddings=embeddings)
             td.reduce(method='UMAP')
-            st.session_state.embedding_type_select = 'documents'
-            st.session_state.text_data_dict.update({'documents': td})
+            st.session_state.embedding_type_select = 'Document'
+            st.session_state.text_data_dict.update({'Document': td})
             st.session_state.current_reduction = td.last_reduction
             st.session_state.data_type_dict.update({'Metadata': ['csv']})
         elif data_type == 'Metadata':
@@ -117,7 +118,7 @@ def load_file():
             td = fetch_td(st.session_state.embedding_type_select)
             td.metadata = metadata
             st.session_state.source_file = metadata
-            st.session_state.text_data_dict.update({'documents': td})
+            st.session_state.text_data_dict.update({'Document': td})
     return
 
 
@@ -143,13 +144,12 @@ def set_text():
         # Create a new TextData object with the text as its docs
         data_type = st.session_state.data_type
         if data_type == 'Tabular data with text column':
-            text_type = st.session_state.embedding_type
+            text_type = 'Document'
             td = TextData(docs=docs, metadata=sf)
-            st.session_state.embedding_type_select = text_type
         elif data_type == 'Metadata':
             # Setting the docs for the current TextData object
-            text_type = 'documents'
-            td = fetch_td('documents')
+            text_type = 'Document'
+            td = fetch_td('Document')
             td.docs = docs
 
             # Running cluster keywords, if any cluster models have been run; this
@@ -167,6 +167,7 @@ def set_text():
                             )
 
         # Set some other session state variables
+        st.session_state.embedding_type = text_type
         st.session_state.text_data_dict.update({text_type: td})
         st.session_state.hover_columns = [text_col]
         st.session_state.source_file = sf
@@ -179,19 +180,36 @@ def fetch_embeddings():
     PCA reduction for initial visualization."""
     # Get the current (embedding-less) TD object
     old_name = st.session_state.embedding_type_select
+    emb_type = st.session_state.embedding_type
     td = deepcopy(fetch_td(old_name))
 
     # Fetch the embeddings and rename the current object, if it exists
     if td is not None:
         # Get things ready to rename the TextData object
-        emb_type = st.session_state.embedding_type
         model_name = st.session_state.embedding_model
         new_name = emb_type + ' (' + model_name + ')'
-        st.session_state.embedding_type_select = new_name
+
+        # Splitting docs into smaller chunks, if specified
+        if emb_type != 'Document':
+            docs = td.docs
+            doc_ids = range(len(docs))
+            if emb_type == 'Sentence':
+                docs, doc_ids = split_docs(
+                    docs=docs,
+                    doc_ids=doc_ids,
+                    split_by='sentence'
+                )
+            elif emb_type == 'idear':
+                pass
+            td.docs = docs
+            doc_ids = [int(id) for id in doc_ids]
+            td.metadata = td.metadata.iloc[doc_ids, :].reset_index(drop=True)
+            td.metadata[st.session_state.text_column] = docs
 
         # Add TD object to the dict in session state with the new, embedding-
         # specific name.
         st.session_state.text_data_dict.update({new_name: td})
+        st.session_state.embedding_type_select = new_name
 
         # Get the embeddings and running dimensionality reduction
         td.embed(model_name=model_name)
@@ -199,8 +217,8 @@ def fetch_embeddings():
 
         # Delete the generic TD object from the session state dict; only
         # triggered the first time embeddings are run
-        if old_name == 'document':
-            del st.session_state.text_data_dict[old_name]
+        if emb_type == 'Document':
+            del st.session_state.text_data_dict[emb_type]
 
     # Return an error if it doesn't exist
     else:
@@ -487,7 +505,7 @@ def split_docs(docs, doc_ids, split_by='idea'):
         new_docs = [[s for s in nlp(d).sents] for d in docs]
         new_doc_ids = [[doc_ids[i]] * len(l) for i, l in enumerate(new_docs)]
     elif split_by == 'idea':
-        #oai.load_openai_settings()
+        oai.load_openai_settings(mode='chat')
         for i, doc in enumerate(docs):
             print(i)
             wait = 2
