@@ -5,7 +5,7 @@ en-core-web-trf @ https://github.com/explosion/spacy-models/releases/download/en
 huggingface-hub
 Markdown==3.7
 matplotlib==3.8.4
-numpy
+numpy==1.26.2
 openai==0.28.0
 openpyxl
 pandas==2.2.3
