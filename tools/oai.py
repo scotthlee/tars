@@ -14,8 +14,7 @@ def load_openai_settings(mode='chat'):
     }
     model = mode_choices[mode]
     options = st.session_state.openai_dict[mode][model]
-    openai.api_base = options['url']
-    openai.api_key = options['key']
+    openai.api_base = options['base_url']
     openai.api_type = st.session_state.api_type
-    openai.api_version = st.session_state.api_version
+    openai.api_version = options['api_version']
     return

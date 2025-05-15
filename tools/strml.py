@@ -204,15 +204,23 @@ def fetch_embeddings():
             td.metadata = td.metadata.iloc[doc_ids, :].reset_index(drop=True)
             td.metadata[st.session_state.text_column] = docs
 
+        # Optinoally creating an Azure OpenAI API client
+        client = None
+        if model_name == 'ada-002':
+            client = openai.AzureOpenAI(
+                api_version=st.session_state.embedding_api_version,
+                api_key=os.environ["OPENAI_API_KEY"],
+                azure_endpoint=st.session_state.embedding_base_url
+            )
         # Add TD object to the dict in session state with the new, embedding-
         # specific name.
         st.session_state.text_data_dict.update({new_name: td})
         st.session_state.embedding_type_select = new_name
 
         # Get the embeddings and running dimensionality reduction
-        td.embed(model_name=model_name)
+        td.embed(model_name=model_name, client=client)
         reduce_dimensions()
-    
+
     # Return an error if it doesn't exist
     else:
         st.error('Please specify a text column to embed.')
@@ -363,8 +371,13 @@ def generate_report():
                     "content": instructions
                 },
             ]
-            completion = openai.ChatCompletion.create(
-                engine=st.session_state.engine,
+            client = openai.AzureOpenAI(
+                api_version=st.session_state.chat_api_version,
+                api_key=os.environ["OPENAI_API_KEY"],
+                azure_endpoint=st.session_state.base_url
+            )
+            completion = client.chat.completions.create(
+                model='gpt-4o-nofilter',
                 messages=message,
                 temperature=st.session_state.temperature,
                 max_tokens=st.session_state.max_tokens,
@@ -373,7 +386,7 @@ def generate_report():
                 presence_penalty=st.session_state.presence_penalty,
                 stop=None
             )
-            res = completion['choices'][0]['message']['content']
+            res = completion.choices[0].message.content
             res += '\n\n'
 
             # Add the sample docs for reference
@@ -411,8 +424,8 @@ def generate_report():
                 "content": instructions
             },
         ]
-        completion = openai.ChatCompletion.create(
-            engine=st.session_state.engine,
+        completion = client.chat.completions.create(
+            model='gpt-4o-nofilter',
             messages=message,
             temperature=st.session_state.temperature,
             max_tokens=st.session_state.max_tokens,
@@ -421,7 +434,7 @@ def generate_report():
             presence_penalty=st.session_state.presence_penalty,
             stop=None
         )
-        res = completion['choices'][0]['message']['content']
+        res = completion.choices[0].message.content
         res = "#Overall Summary\n\n" + res + "\n\n\n"
         res += "#Cluster-Specific Summaries\n\n"
 

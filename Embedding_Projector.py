@@ -70,19 +70,19 @@ st.session_state.gpt_keys = [
 ]
 openai_dict = {
     'chat':{
-        'gpt-4': {
-            'engine': 'edav-api-share-gpt4-api-nofilter',
-            'url': os.environ['OPENAI_BASE_URL'],
-            'key': os.environ["OPENAI_API_KEY"],
+        'gpt-4o': {
+            'model': 'gpt-4o-nofilter',
+            'api_version': '2024-08-01-preview',
+            'base_url': os.environ['GPT4O_BASE_URL'],
             'tokens_in': 128000,
             'tokens_out': 4096
-        }
+        },
     },
     'embeddings': {
         'ada-002': {
-            'engine': 'text-embedding-ada-002',
-            'url': os.environ['OPENAI_BASE_URL'],
-            'key': os.environ['OPENAI_API_KEY'],
+            'model': 'text-embedding-ada-002',
+            'api_version': '2023-07-01-preview',
+            'base_url': os.environ['ADA002_BASE_URL'],
             'type': 'openai',
             'tokens_in': 8192,
             'tpm_limit': 120000,
@@ -92,8 +92,7 @@ openai_dict = {
 }
 openai_defaults = {
     'chat': {
-        'model': 'gpt-4',
-        'engine': os.environ['OPENAI_GPT_DEPLOYMENT'],
+        'model': 'gpt-4o',
         'max_tokens': None,
         'top_p': 0.95,
         'temperature': 0.20,
@@ -102,7 +101,6 @@ openai_defaults = {
     },
     'embeddings': {
         'model': 'ada-002',
-        'engine': 'text-embedding-ada-002'
     }
 }
 
@@ -110,16 +108,25 @@ if 'openai_dict' not in st.session_state:
     st.session_state.openai_dict = openai_dict
 if 'chat_model' not in st.session_state:
     st.session_state.chat_model = openai_defaults['chat']['model']
-if 'chat_engine' not in st.session_state:
-    st.session_state.engine = openai_defaults['chat']['engine']
-if 'chat_engine_choices' not in st.session_state:
-    st.session_state.engine_choices = list(openai_dict['chat'].keys())
+if 'chat_api_version' not in st.session_state:
+    st.session_state.chat_api_version = openai_dict['chat']['gpt-4o']['api_version']
+if 'chat_base_url' not in st.session_state:
+    st.session_state.base_url = openai_dict['chat']['gpt-4o']['base_url']
 if 'gpt_persona' not in st.session_state:
     st.session_state.gpt_persona = "You are a health communications specialist \
     with expertise in qualitative analysis."
 
-if 'embedding_engine' not in st.session_state:
-    st.session_state.embedding_engine = openai_defaults['embeddings']['engine']
+if 'temperature' not in st.session_state:
+    st.session_state.temperature = openai_defaults['chat']['temperature']
+if 'max_tokens' not in st.session_state:
+    st.session_state.max_tokens = openai_defaults['chat']['max_tokens']
+if 'top_p' not in st.session_state:
+    st.session_state.top_p = openai_defaults['chat']['top_p']
+if 'presence_penalty' not in st.session_state:
+    st.session_state.presence_penalty = openai_defaults['chat']['presence_penalty']
+if 'frequency_penalty' not in st.session_state:
+    st.session_state.frequency_penalty = openai_defaults['chat']['frequency_penalty']
+
 if 'embedding_model' not in st.session_state:
     st.session_state.embedding_model = openai_defaults['embeddings']['model']
 if 'embedding_model_choices' not in st.session_state:
@@ -132,23 +139,13 @@ if 'enable_generate_button' not in st.session_state:
     st.session_state.enable_generate_button = False
 if 'embedding_type' not in st.session_state:
     st.session_state.embedding_type = None
+if 'embedding_api_version' not in st.session_state:
+    st.session_state.embedding_api_version = '2023-07-01-preview'
+if 'embedding_base_url' not in st.session_state:
+    st.session_state.embedding_base_url = os.environ['ADA002_BASE_URL']
 
 if 'api_type' not in st.session_state:
     st.session_state.api_type = os.environ['OPENAI_API_TYPE']
-if 'api_version' not in st.session_state:
-    st.session_state.api_version = os.environ['OPENAI_API_VERSION']
-if 'base_url' not in st.session_state:
-    st.session_state.base_url = openai_dict['chat'][st.session_state.chat_model]['url']
-if 'temperature' not in st.session_state:
-    st.session_state.temperature = openai_defaults['chat']['temperature']
-if 'max_tokens' not in st.session_state:
-    st.session_state.max_tokens = openai_defaults['chat']['max_tokens']
-if 'top_p' not in st.session_state:
-    st.session_state.top_p = openai_defaults['chat']['top_p']
-if 'presence_penalty' not in st.session_state:
-    st.session_state.presence_penalty = openai_defaults['chat']['presence_penalty']
-if 'frequency_penalty' not in st.session_state:
-    st.session_state.frequency_penalty = openai_defaults['chat']['frequency_penalty']
 
 # Setting up the I?O objects
 if 'embedding_type_select' not in st.session_state:
@@ -903,7 +900,8 @@ with st.sidebar:
     if has_reduction:
         with st.expander('Switch Projection', expanded=False):
             td_keys = list(st.session_state.text_data_dict.keys())
-            td_keys.remove('Base')
+            if 'Base' in td_keys:
+                td_keys.remove('Base')
             td_select = st.selectbox(
                 label='Base embeddings',
                 key='_embedding_type_select',
@@ -920,6 +918,47 @@ with st.sidebar:
                 on_change=strml.update_settings,
                 kwargs={'keys': ['current_reduction']},
             )
+    with st.expander('ChatGPT', expanded=False):
+        gpt_models = ['gpt-4o']
+        chat_model = st.selectbox(
+            label='Base Model',
+            key='_chat_model',
+            index=gpt_models.index(st.session_state.chat_model),
+            options=gpt_models,
+            on_change=strml.update_settings,
+            kwargs={'keys': ['chat_model']},
+            help='Which GPT model to use for summarizing document clusters.'
+        )
+        st.number_input(label='Max Tokens',
+                        key='_max_tokens',
+                        on_change=strml.update_settings,
+                        kwargs={'keys': ['max_tokens']},
+                        value=st.session_state.max_tokens)
+        st.slider(label='Temperature',
+                key='_temperature',
+                on_change=strml.update_settings,
+                kwargs={'keys': ['temperature']},
+                value=st.session_state.temperature)
+        st.slider(label='Top P',
+                key='_top_p',
+                on_change=strml.update_settings,
+                kwargs={'keys': ['top_p']},
+                value=st.session_state.top_p)
+        st.slider(label='Presence Penalty',
+                min_value=0.0,
+                max_value=2.0,
+                key='_presence_penalty',
+                on_change=strml.update_settings,
+                kwargs={'keys': ['presence_penalty']},
+                value=st.session_state.presence_penalty)
+        st.slider(label='Frequency Penalty',
+                min_value=0.0,
+                max_value=2.0,
+                key='_frequency_penalty',
+                on_change=strml.update_settings,
+                kwargs={'keys': ['frequency_penalty']},
+                value=st.session_state.frequency_penalty)
+        st.button('Reset', on_click=strml.reset_gpt)
 
 
 # Making the main visualization

@@ -31,6 +31,7 @@ class TextData:
 
     def embed(
         self,
+        client=None,
         model_name='ada-002',
         engine='text-embedding-ada-002'
     ):
@@ -47,15 +48,12 @@ class TextData:
             with st.spinner('Generating the embeddings...'):
                 for block_num, doc_block in enumerate(doc_blocks):
                     try:
-                        response = openai.Embedding.create(
+                        response = client.embeddings.create(
                             input=doc_block,
-                            engine=engine,
+                            model='text-embedding-ada-002',
                         )
                         embedding_list.append(
-                            np.array([
-                                 response['data'][i]['embedding']
-                                 for i in range(len(doc_block))
-                            ])
+                            np.array([d.embedding for d in response.data])
                         )
                     except openai.APIError as e:
                         st.write(f"OpenAI API returned an API Error: {e}")
@@ -80,11 +78,15 @@ class TextData:
         embeddings are stored as a data.EmbeddingReduction() object stored in
         the TextData object's reductions dict attribute.
         """
-        reducer = data.EmbeddingReduction(method=method,
-                                          dimensions=dimensions)
-        reducer.fit(self.embeddings,
-                    main_kwargs=main_kwargs,
-                    aux_kwargs=aux_kwargs)
+        reducer = data.EmbeddingReduction(
+            method=method,
+            dimensions=dimensions
+        )
+        reducer.fit(
+            self.embeddings,
+            main_kwargs=main_kwargs,
+            aux_kwargs=aux_kwargs
+        )
         self.reductions.update({reducer.name: reducer})
         self.last_reduction = reducer.name
         return
