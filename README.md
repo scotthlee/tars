@@ -61,10 +61,9 @@ There are a number of ways to [deploy Streamlit apps](https://docs.posit.co/conn
 --server POSIT_CONNECT_SERVER_ADDRESS \
 --api-key YOUR_API_KEY \
 --entrypoint Embedding_Projector.py \
---environment OPENAI_BASE_URL \
+--environment ADA002_BASE_URL \
+--environment GPT4O_BASE_URL \
 --environment OPENAI_API_TYPE \
---environment OPENAI_API_VERSION \
---environment OPENAI_GPT_DEPLOYMENT \
 --environment SP_TENANT_ID \
 --environment SP_CLIENT_ID \
 --environment SP_CLIENT_SECRET \
