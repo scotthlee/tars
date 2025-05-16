@@ -371,13 +371,15 @@ def generate_report():
                     "content": instructions
                 },
             ]
+            model = st.session_state.chat_model
+            openai_dict = st.session_state.openai_dict
             client = openai.AzureOpenAI(
-                api_version=st.session_state.chat_api_version,
+                api_version=openai_dict['chat'][model]['api_version'],
                 api_key=os.environ["OPENAI_API_KEY"],
-                azure_endpoint=st.session_state.base_url
+                azure_endpoint=openai_dict['chat'][model]['base_url']
             )
             completion = client.chat.completions.create(
-                model='gpt-4o-nofilter',
+                model=openai_dict['chat'][model]['model'],
                 messages=message,
                 temperature=st.session_state.temperature,
                 max_tokens=st.session_state.max_tokens,
@@ -425,7 +427,7 @@ def generate_report():
             },
         ]
         completion = client.chat.completions.create(
-            model='gpt-4o-nofilter',
+            model=openai_dict['chat'][model]['model'],
             messages=message,
             temperature=st.session_state.temperature,
             max_tokens=st.session_state.max_tokens,

@@ -68,31 +68,74 @@ st.session_state.gpt_keys = [
     'engine', 'max_tokens', 'top_p', 'temperature',
     'frequency_penalty', 'presence_penalty'
 ]
-openai_dict = {
-    'chat':{
-        'gpt-4o': {
-            'model': 'gpt-4o-nofilter',
-            'api_version': '2024-08-01-preview',
-            'base_url': os.environ['GPT4O_BASE_URL'],
-            'tokens_in': 128000,
-            'tokens_out': 4096
+
+# Bools to check which models are available
+environ = list(os.environ.keys())
+has_4o = 'GPT4O_BASE_URL' in environ
+has_4o_mini = 'GPT4O_MINI_BASE_URL' in environ
+has_4 = 'GPT4_BASE_URL' in environ
+has_ada = 'ADA002_BASE_URL' in environ
+chat_bools = [has_4o, has_4o_mini, has_4]
+var_names = ['GPT4O', 'GPT4O_MINI', 'GPT4']
+
+# Building the dict of options for what's available
+if 'openai_dict' not in st.session_state:
+    st.session_state.openai_dict =  {
+        'chat':{
+            'gpt-4o': {
+                    'tokens_in': 128000,
+                    'tokens_out': 16384
+            },
+            'gpt-4o-mini': {
+                'tokens_in': 128000,
+                'tokens_out': 16384
+            },
+            'gpt-4': {
+                'tokens_in': 32000,
+                'tokens_out': 4096
+            }
         },
-    },
-    'embeddings': {
-        'ada-002': {
-            'model': 'text-embedding-ada-002',
-            'api_version': '2023-07-01-preview',
-            'base_url': os.environ['ADA002_BASE_URL'],
-            'type': 'openai',
-            'tokens_in': 8192,
-            'tpm_limit': 120000,
-            'document_limit': None
+        'embeddings': {
+            'ada-002': {
+                'tokens_in': 8192,
+                'tpm_limit': 120000,
+                'document_limit': None
+            }
         }
     }
-}
+
+# Bool for whether the page run is on startup
+if 'new_run' not in st.session_state:
+    st.session_state.new_run = True
+
+# Update the entries for the models in our dict; only on startup
+if st.session_state.new_run:
+    for i, m in enumerate(list(st.session_state.openai_dict['chat'].keys())):
+        var_name = var_names[i]
+        if chat_bools[i]:
+            st.session_state.openai_dict['chat'][m].update({
+                'base_url': os.environ[var_name + '_BASE_URL'],
+                'api_version': os.environ[var_name + '_API_VERSION'],
+                'model': os.environ[var_name + '_MODEL_NAME']
+            })
+        else:
+            del st.session_state.openai_dict['chat'][m]
+    if has_ada:
+        st.session_state.openai_dict['embeddings']['ada-002'].update({
+            'base_url': os.environ['ADA002_BASE_URL'],
+            'api_version': os.environ['ADA002_API_VERSION']
+        })
+    st.session_state.new_run = False
+chat_models =list(st.session_state.openai_dict['chat'].keys())
+
+# Setting the session defaults
+default_model = list(st.session_state.openai_dict['chat'].keys())[0]
+model_dict = st.session_state.openai_dict['chat'][default_model]
 openai_defaults = {
     'chat': {
-        'model': 'gpt-4o',
+        'model': default_model,
+        'base_url': model_dict['base_url'],
+        'api_version': model_dict['api_version'],
         'max_tokens': None,
         'top_p': 0.95,
         'temperature': 0.20,
@@ -104,14 +147,8 @@ openai_defaults = {
     }
 }
 
-if 'openai_dict' not in st.session_state:
-    st.session_state.openai_dict = openai_dict
 if 'chat_model' not in st.session_state:
     st.session_state.chat_model = openai_defaults['chat']['model']
-if 'chat_api_version' not in st.session_state:
-    st.session_state.chat_api_version = openai_dict['chat']['gpt-4o']['api_version']
-if 'chat_base_url' not in st.session_state:
-    st.session_state.base_url = openai_dict['chat']['gpt-4o']['base_url']
 if 'gpt_persona' not in st.session_state:
     st.session_state.gpt_persona = "You are a health communications specialist \
     with expertise in qualitative analysis."
@@ -128,10 +165,10 @@ if 'frequency_penalty' not in st.session_state:
     st.session_state.frequency_penalty = openai_defaults['chat']['frequency_penalty']
 
 if 'embedding_model' not in st.session_state:
-    st.session_state.embedding_model = openai_defaults['embeddings']['model']
+    st.session_state.embedding_model = 'all-MiniLM-L6-v2'
 if 'embedding_model_choices' not in st.session_state:
     st.session_state.embedding_model_choices = [
-        'ada-002', 'all-MiniLM-L6-v2'
+        'all-MiniLM-L6-v2', 'ada-002'
     ]
 if 'embeddings' not in st.session_state:
     st.session_state.embeddings = None
@@ -139,10 +176,11 @@ if 'enable_generate_button' not in st.session_state:
     st.session_state.enable_generate_button = False
 if 'embedding_type' not in st.session_state:
     st.session_state.embedding_type = None
-if 'embedding_api_version' not in st.session_state:
-    st.session_state.embedding_api_version = '2023-07-01-preview'
-if 'embedding_base_url' not in st.session_state:
-    st.session_state.embedding_base_url = os.environ['ADA002_BASE_URL']
+if has_ada:
+    if 'embedding_api_version' not in st.session_state:
+        st.session_state.embedding_api_version = os.environ['ADA002_API_VERSION']
+    if 'embedding_base_url' not in st.session_state:
+        st.session_state.embedding_base_url = os.environ['ADA002_BASE_URL']
 
 if 'api_type' not in st.session_state:
     st.session_state.api_type = os.environ['OPENAI_API_TYPE']
@@ -919,12 +957,11 @@ with st.sidebar:
                 kwargs={'keys': ['current_reduction']},
             )
     with st.expander('ChatGPT', expanded=False):
-        gpt_models = ['gpt-4o']
-        chat_model = st.selectbox(
+        model_choice = st.selectbox(
             label='Base Model',
             key='_chat_model',
-            index=gpt_models.index(st.session_state.chat_model),
-            options=gpt_models,
+            index=chat_models.index(st.session_state.chat_model),
+            options=chat_models,
             on_change=strml.update_settings,
             kwargs={'keys': ['chat_model']},
             help='Which GPT model to use for summarizing document clusters.'
