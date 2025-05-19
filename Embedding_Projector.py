@@ -42,9 +42,6 @@ st.set_page_config(
     }
 )
 
-if 'about_text' not in st.session_state:
-    st.session_state.about_text = about_text
-
 # Fetch an API key
 def load_api_key():
     """Get API Key using Azure Service Principal."""
@@ -78,137 +75,30 @@ has_ada = 'ADA002_BASE_URL' in environ
 chat_bools = [has_4o, has_4o_mini, has_4]
 var_names = ['GPT4O', 'GPT4O_MINI', 'GPT4']
 
-# Building the dict of options for what's available
-if 'openai_dict' not in st.session_state:
-    st.session_state.openai_dict =  {
-        'chat':{
-            'gpt-4o': {
-                    'tokens_in': 128000,
-                    'tokens_out': 16384
-            },
-            'gpt-4o-mini': {
+# OpenAI API config
+openai_dict = {
+    'chat':{
+        'gpt-4o': {
                 'tokens_in': 128000,
                 'tokens_out': 16384
-            },
-            'gpt-4': {
-                'tokens_in': 32000,
-                'tokens_out': 4096
-            }
         },
-        'embeddings': {
-            'ada-002': {
-                'tokens_in': 8192,
-                'tpm_limit': 120000,
-                'document_limit': None
-            }
+        'gpt-4o-mini': {
+            'tokens_in': 128000,
+            'tokens_out': 16384
+        },
+        'gpt-4': {
+            'tokens_in': 32000,
+            'tokens_out': 4096
         }
-    }
-
-# Bool for whether the page run is on startup
-if 'new_run' not in st.session_state:
-    st.session_state.new_run = True
-
-# Update the entries for the models in our dict; only on startup
-if st.session_state.new_run:
-    for i, m in enumerate(list(st.session_state.openai_dict['chat'].keys())):
-        var_name = var_names[i]
-        if chat_bools[i]:
-            st.session_state.openai_dict['chat'][m].update({
-                'base_url': os.environ[var_name + '_BASE_URL'],
-                'api_version': os.environ[var_name + '_API_VERSION'],
-                'model': os.environ[var_name + '_MODEL_NAME']
-            })
-        else:
-            del st.session_state.openai_dict['chat'][m]
-    if has_ada:
-        st.session_state.openai_dict['embeddings']['ada-002'].update({
-            'base_url': os.environ['ADA002_BASE_URL'],
-            'api_version': os.environ['ADA002_API_VERSION']
-        })
-    st.session_state.new_run = False
-chat_models =list(st.session_state.openai_dict['chat'].keys())
-
-# Setting the session defaults
-default_model = list(st.session_state.openai_dict['chat'].keys())[0]
-model_dict = st.session_state.openai_dict['chat'][default_model]
-openai_defaults = {
-    'chat': {
-        'model': default_model,
-        'base_url': model_dict['base_url'],
-        'api_version': model_dict['api_version'],
-        'max_tokens': None,
-        'top_p': 0.95,
-        'temperature': 0.20,
-        'presence_penalty': 0.0,
-        'frequency_penalty': 0.0
     },
     'embeddings': {
-        'model': 'ada-002',
+        'ada-002': {
+            'tokens_in': 8192,
+            'tpm_limit': 120000,
+            'document_limit': None
+        }
     }
 }
-
-if 'chat_model' not in st.session_state:
-    st.session_state.chat_model = openai_defaults['chat']['model']
-if 'gpt_persona' not in st.session_state:
-    st.session_state.gpt_persona = "You are a health communications specialist \
-    with expertise in qualitative analysis."
-
-if 'temperature' not in st.session_state:
-    st.session_state.temperature = openai_defaults['chat']['temperature']
-if 'max_tokens' not in st.session_state:
-    st.session_state.max_tokens = openai_defaults['chat']['max_tokens']
-if 'top_p' not in st.session_state:
-    st.session_state.top_p = openai_defaults['chat']['top_p']
-if 'presence_penalty' not in st.session_state:
-    st.session_state.presence_penalty = openai_defaults['chat']['presence_penalty']
-if 'frequency_penalty' not in st.session_state:
-    st.session_state.frequency_penalty = openai_defaults['chat']['frequency_penalty']
-
-if 'embedding_model' not in st.session_state:
-    st.session_state.embedding_model = 'all-MiniLM-L6-v2'
-if 'embedding_model_choices' not in st.session_state:
-    st.session_state.embedding_model_choices = [
-        'all-MiniLM-L6-v2', 'ada-002'
-    ]
-if 'embeddings' not in st.session_state:
-    st.session_state.embeddings = None
-if 'enable_generate_button' not in st.session_state:
-    st.session_state.enable_generate_button = False
-if 'embedding_type' not in st.session_state:
-    st.session_state.embedding_type = None
-if has_ada:
-    if 'embedding_api_version' not in st.session_state:
-        st.session_state.embedding_api_version = os.environ['ADA002_API_VERSION']
-    if 'embedding_base_url' not in st.session_state:
-        st.session_state.embedding_base_url = os.environ['ADA002_BASE_URL']
-
-if 'api_type' not in st.session_state:
-    st.session_state.api_type = os.environ['OPENAI_API_TYPE']
-
-# Setting up the I?O objects
-if 'embedding_type_select' not in st.session_state:
-    st.session_state.embedding_type_select = None
-if 'reduction_select' not in st.session_state:
-    st.session_state.reduction_select = None
-if 'premade_loaded' not in st.session_state:
-    st.session_state.premade_loaded = False
-if 'text_data_dict' not in st.session_state:
-    st.session_state.text_data_dict = {}
-if 'current_text_data' not in st.session_state:
-    st.session_state.current_text_data = None
-if 'source_file' not in st.session_state:
-    st.session_state.source_file = None
-if 'metadata' not in st.session_state:
-    st.session_state.metadata = None
-if 'text_column' not in st.session_state:
-    st.session_state.text_column = None
-if 'data_type' not in st.session_state:
-    st.session_state.data_type = 'Tabular data with text column'
-if 'data_type_dict' not in st.session_state:
-    st.session_state.data_type_dict = {
-        'Tabular data with text column': ['csv'],
-        'Premade embeddings': ['csv', 'tsv']
-    }
 
 # Setting up the dimensionality reduction options
 reduction_dict = {
@@ -235,27 +125,6 @@ reduction_dict = {
         'defaults': {}
     }
 }
-
-if 'reduction_dict' not in st.session_state:
-    st.session_state.reduction_dict = reduction_dict
-if 'reduce_to_3d' not in st.session_state:
-    st.session_state.reduce_to_3d = True
-if 'reduction' not in st.session_state:
-    st.session_state.reduction = None
-if 'reduction_method' not in st.session_state:
-    st.session_state.reduction_method = 'UMAP'
-if 'umap_n_neighbors' not in st.session_state:
-    st.session_state.umap_n_neighbors = 15
-if 'umap_min_dist' not in st.session_state:
-    st.session_state.umap_min_dist = 0.1
-if 'tsne_perplexity' not in st.session_state:
-    st.session_state.tsne_perplexity = 30.0
-if 'tsne_learning_rate' not in st.session_state:
-    st.session_state.tsne_learning_rate = 1000.0
-if 'tsne_n_iter' not in st.session_state:
-    st.session_state.tsne_n_iter = 1000
-if 'current_reduction' not in st.session_state:
-    st.session_state.current_reduction = None
 
 # Setting the clustering param defaults
 cluster_defaults = {
@@ -316,9 +185,135 @@ cluster_dict = {
     }
 }
 
-# Assigning initial session state values for the clustering models; the
-# 'dbscan_eps' reference is arbitrary, as any session state key would work.
-if 'dbscan_eps' not in st.session_state:
+# Bool for whether the page run is on startup
+if 'new_run' not in st.session_state:
+    st.session_state.new_run = True
+
+# Update the entries for the models in our dict; only on startup
+if st.session_state.new_run:
+    # Set the app "about" text
+    st.session_state.about_text = about_text
+
+    # Set the OpenAI API variables
+    st.session_state.openai_dict = openai_dict
+    st.session_state.api_type = os.environ['OPENAI_API_TYPE']
+
+    for i, m in enumerate(list(st.session_state.openai_dict['chat'].keys())):
+        var_name = var_names[i]
+        if chat_bools[i]:
+            st.session_state.openai_dict['chat'][m].update({
+                'base_url': os.environ[var_name + '_BASE_URL'],
+                'api_version': os.environ[var_name + '_API_VERSION'],
+                'model': os.environ[var_name + '_MODEL_NAME']
+            })
+        else:
+            del st.session_state.openai_dict['chat'][m]
+    if has_ada:
+        st.session_state.openai_dict['embeddings']['ada-002'].update({
+            'base_url': os.environ['ADA002_BASE_URL'],
+            'api_version': os.environ['ADA002_API_VERSION']
+        })
+        st.session_state.embedding_api_version = os.environ['ADA002_API_VERSION']
+        st.session_state.embedding_base_url = os.environ['ADA002_BASE_URL']
+
+    default_model = list(st.session_state.openai_dict['chat'].keys())[0]
+    model_dict = st.session_state.openai_dict['chat'][default_model]
+
+    # Setting the session defaults
+    openai_defaults = {
+        'chat': {
+            'model': default_model,
+            'base_url': model_dict['base_url'],
+            'api_version': model_dict['api_version'],
+            'max_tokens': None,
+            'top_p': 0.95,
+            'temperature': 0.20,
+            'presence_penalty': 0.0,
+            'frequency_penalty': 0.0
+        },
+        'embeddings': {
+            'model': 'ada-002',
+        }
+    }
+
+    st.session_state.chat_model = openai_defaults['chat']['model']
+    st.session_state.gpt_persona = "You are a health communications specialist \
+    with expertise in qualitative analysis."
+    st.session_state.temperature = openai_defaults['chat']['temperature']
+    st.session_state.max_tokens = openai_defaults['chat']['max_tokens']
+    st.session_state.top_p = openai_defaults['chat']['top_p']
+    st.session_state.presence_penalty = openai_defaults['chat']['presence_penalty']
+    st.session_state.frequency_penalty = openai_defaults['chat']['frequency_penalty']
+
+    # Set the embedding variables
+    st.session_state.embedding_model = 'all-MiniLM-L6-v2'
+    st.session_state.embedding_model_choices = [
+            'all-MiniLM-L6-v2', 'ada-002'
+    ]
+    st.session_state.embeddings = None
+    st.session_state.enable_generate_button = False
+    st.session_state.embedding_type = None
+
+    # Setting up the I?O objects
+    st.session_state.embedding_type_select = None
+    st.session_state.reduction_select = None
+    st.session_state.premade_loaded = False
+    st.session_state.text_data_dict = {}
+    st.session_state.current_text_data = None
+    st.session_state.source_file = None
+    st.session_state.metadata = None
+    st.session_state.text_column = None
+    st.session_state.data_type = 'Tabular data with text column'
+    st.session_state.data_type_dict = {
+        'Tabular data with text column': ['csv'],
+        'Premade embeddings': ['csv', 'tsv']
+    }
+    st.session_state.new_run = False
+    st.session_state.chat_model = openai_defaults['chat']['model']
+    st.session_state.gpt_persona = "You are a health communications specialist \
+    with expertise in qualitative analysis."
+    st.session_state.temperature = openai_defaults['chat']['temperature']
+    st.session_state.max_tokens = openai_defaults['chat']['max_tokens']
+    st.session_state.top_p = openai_defaults['chat']['top_p']
+    st.session_state.presence_penalty = openai_defaults['chat']['presence_penalty']
+    st.session_state.frequency_penalty = openai_defaults['chat']['frequency_penalty']
+
+    st.session_state.embedding_model = 'all-MiniLM-L6-v2'
+    st.session_state.embedding_model_choices = [
+        'all-MiniLM-L6-v2', 'ada-002'
+    ]
+    st.session_state.embeddings = None
+    st.session_state.enable_generate_button = False
+    st.session_state.embedding_type = None
+
+    # Setting up the I?O objects
+    st.session_state.embedding_type_select = None
+    st.session_state.reduction_select = None
+    st.session_state.premade_loaded = False
+    st.session_state.text_data_dict = {}
+    st.session_state.current_text_data = None
+    st.session_state.source_file = None
+    st.session_state.metadata = None
+    st.session_state.text_column = None
+    st.session_state.data_type = 'Tabular data with text column'
+    st.session_state.data_type_dict = {
+        'Tabular data with text column': ['csv'],
+        'Premade embeddings': ['csv', 'tsv']
+    }
+
+    # Set the dimension reduction variables
+    st.session_state.reduction_dict = reduction_dict
+    st.session_state.reduce_to_3d = True
+    st.session_state.reduction = None
+    st.session_state.reduction_method = 'UMAP'
+    st.session_state.umap_n_neighbors = 15
+    st.session_state.umap_min_dist = 0.1
+    st.session_state.tsne_perplexity = 30.0
+    st.session_state.tsne_learning_rate = 1000.0
+    st.session_state.tsne_n_iter = 1000
+    st.session_state.current_reduction = None
+
+    # Setting the algorithm-specific clustering variables
     for method in list(cluster_defaults.keys()):
         ln = cluster_dict[method]['lower_name']
         for param in cluster_dict[method]['params']:
@@ -326,80 +321,55 @@ if 'dbscan_eps' not in st.session_state:
             p_def = cluster_defaults[method][param]
             st.session_state[pn] = p_def
 
-# Setting the higher-level clusterinv variables
-if 'cluster_dict' not in st.session_state:
+    # Setting the higher-level clusterinv variables
     st.session_state.cluster_dict = cluster_dict
-if 'clustering_algorithm' not in st.session_state:
     st.session_state.clustering_algorithm = 'DBSCAN'
-if 'cluster_kwargs' not in st.session_state:
     st.session_state.cluster_kwargs = {}
-if 'cluster_column_name' not in st.session_state:
     st.session_state.cluster_column_name = ''
-if 'cluster_metric_dict' not in st.session_state:
     st.session_state.cluster_metric_dict = {
         'Silhouette Score': 'silhouette_score',
         'Calinski-Harbasz Score': 'calinski_harabasz_score',
         'Davies-Bouldin Score': 'davies_bouldin_score'
     }
 
-# Setting up the labeling options
-if 'label_how' not in st.session_state:
+    # Setting up the labeling options
     st.session_state.label_how = 'By keywords'
-if 'keyword_type' not in st.session_state:
     st.session_state.keyword_type = 'TF-IDF'
-if 'label_n_neighbors' not in st.session_state:
     st.session_state.label_n_neighbors = 10
-if 'label_text_column' not in st.session_state:
     st.session_state.label_text_column = None
 
-# Setting up the file download toggles
-for k in ['original', 'embeddings', 'reduction', 'labels']:
-    if 'dl_' + k not in st.session_state:
+    # Setting up the file download toggles
+    for k in ['original', 'embeddings', 'reduction', 'labels']:
         st.session_state['dl_' + k] = False
 
-# Setting up the plotting options
-if 'map_in_3d' not in st.session_state:
+    # Setting up the plotting options
     st.session_state.map_in_3d = True
-if 'label_columns' not in st.session_state:
     st.session_state.label_columns = None
-if 'color_column' not in st.session_state:
     st.session_state.color_column = None
-if 'hover_columns' not in st.session_state:
     st.session_state.hover_columns = None
-if 'font_size' not in st.session_state:
     st.session_state.font_size = 16
-if 'plot_width' not in st.session_state:
     st.session_state.plot_width = 800
-if 'plot_height' not in st.session_state:
     st.session_state.plot_height = 800
-if 'marker_size' not in st.session_state:
     st.session_state.marker_size = 3
-if 'marker_opacity' not in st.session_state:
     st.session_state.marker_opacity = 0.6
-if 'show_grid' not in st.session_state:
     st.session_state.show_grid = True
-if 'hover_data' not in st.session_state:
     st.session_state.hover_data = {'d1': False, 'd2': False}
-if 'show_legend' not in st.session_state:
     st.session_state.show_legend = True
-if st.session_state.map_in_3d:
-    st.session_state.hover_data.update({'d3': False})
+    if st.session_state.map_in_3d:
+        st.session_state.hover_data.update({'d3': False})
 
-# Setting up the summary report options
-if 'summary_description' not in st.session_state:
+    # Setting up the summary report options
     st.session_state.summary_description = ''
-if 'summary_top_questions' not in st.session_state:
     st.session_state.summary_top_questions = 'Question 1\nQuestion 2\n...'
-if 'summary_cluster_choice' not in st.session_state:
     st.session_state.cluster_choice = None
-if 'summary_n_samles' not in st.session_state:
     st.session_state.summary_n_samples = 10
-if 'summary_methods_section' not in st.session_state:
     st.session_state.summary_methods_section = False
-if 'summary_report' not in st.session_state:
     st.session_state.summary_report = None
-if 'summary_file_type' not in st.session_state:
     st.session_state.summary_file_type = 'html'
+
+    # Closing the initializaztion loop
+    st.session_state.new_run = False
+
 
 # Loading the handful of variables that don't persist across pages
 to_load = ['text_column', 'data_type']
@@ -957,6 +927,7 @@ with st.sidebar:
                 kwargs={'keys': ['current_reduction']},
             )
     with st.expander('ChatGPT', expanded=False):
+        chat_models =list(st.session_state.openai_dict['chat'].keys())
         model_choice = st.selectbox(
             label='Base Model',
             key='_chat_model',
